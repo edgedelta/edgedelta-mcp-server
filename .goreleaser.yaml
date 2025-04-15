@@ -1,5 +1,5 @@
 version: 2
-project_name: github-mcp-server
+project_name: edgedelta-mcp-server
 before:
   hooks:
     - go mod tidy
