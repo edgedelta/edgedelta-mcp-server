@@ -1,0 +1,13 @@
+# Edge Delta MCP Server dependencies
+
+The following open source dependencies are used to build the [edgedelta/edgedelta-mcp-server][] Edge Delta Model Context Protocol Server.
+
+## Go Packages
+
+Some packages may only be included on certain architectures or operating systems.
+
+{{ range . }}
+ - [{{.Name}}](https://pkg.go.dev/{{.Name}}) ([{{.LicenseName}}]({{.LicenseURL}}))
+{{- end }}
+
+[edgedelta/edgedelta-mcp-server]: https://github.com/edgedelta/edgedelta-mcp-server
