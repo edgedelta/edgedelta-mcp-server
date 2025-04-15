@@ -1,5 +1,4 @@
-ARG BUILDPLATFORM=linux/amd64
-FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+FROM golang:alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG BUILD_VERSION=v0.0.0

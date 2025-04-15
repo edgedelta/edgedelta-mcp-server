@@ -18,6 +18,7 @@ func NewServer(client *Client, version string) *server.MCPServer {
 
 	s.AddTool(logSearch(client))
 	s.AddTool(eventsSearch(client))
+	s.AddTool(anomalySearch(client))
 	return s
 }
 
