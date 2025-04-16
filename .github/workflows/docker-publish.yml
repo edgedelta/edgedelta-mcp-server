@@ -90,6 +90,14 @@ jobs:
         with:
           cache-source: go-build-cache
 
+      - name: Set build date output
+        id: build_date
+        run: echo "value=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Sanitize ref name output
+        id: sanitize
+        run: echo "value=$(echo "${{ github.ref_name }}" | sed 's|/|_|g')" >> $GITHUB_OUTPUT
+
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
@@ -106,7 +114,8 @@ jobs:
           build-args: |
             BUILD_VERSION=${{ github.ref_name }}
             BUILD_COMMIT=${{ github.sha }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            BUILD_DATE=${{ steps.build_date.outputs.value }}
+            BUILD_VERSION=${{ steps.sanitize.outputs.value }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
