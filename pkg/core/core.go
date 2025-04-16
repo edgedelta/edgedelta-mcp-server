@@ -44,37 +44,50 @@ type QueryParamOption func(url.Values)
 
 func WithLookback(lookback string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("lookback", lookback)
+		if lookback != "" {
+			v.Add("lookback", lookback)
+		}
 	}
 }
 
 func WithFromTo(from string, to string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("from", from)
-		v.Add("to", to)
+		if from != "" && to != "" {
+			v.Add("from", from)
+			v.Add("to", to)
+		}
 	}
 }
 
 func WithQuery(query string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("query", query)
+		if query != "" {
+			v.Add("query", query)
+		}
 	}
 }
 
 func WithLimit(limit string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("limit", limit)
+		if limit != "" {
+			v.Add("limit", limit)
+		}
 	}
 }
 
 func WithCursor(cursor string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("cursor", cursor)
+		if cursor != "" {
+			v.Add("cursor", cursor)
+		}
 	}
 }
 
 func WithOrder(order string) QueryParamOption {
 	return func(v url.Values) {
-		v.Add("order", order)
+		if order != "" {
+			v.Add("order", order)
+		}
 	}
+
 }
