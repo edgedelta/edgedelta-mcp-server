@@ -40,6 +40,19 @@ type EventResponse struct {
 	NextCursor string       `json:"next_cursor"`
 }
 
+type PatternStats struct {
+	// Pattern of the cluster
+	Pattern string `json:"pattern"`
+	// Count of cluster in the window
+	Count int `json:"count"`
+	// Proportion of this cluster to rest of the cluster. Rest of the cluster can be scoped to tag or source.
+	Proportion float64 `json:"proportion"`
+	// Sentiment analysis results
+	Sentiment float64 `json:"sentiment"`
+	// Delta is the percentage increase of this cluster's count compared to previous window.
+	Delta float64 `json:"delta"`
+}
+
 type QueryParamOption func(url.Values)
 
 func WithLookback(lookback string) QueryParamOption {
@@ -89,5 +102,28 @@ func WithOrder(order string) QueryParamOption {
 			v.Add("order", order)
 		}
 	}
+}
 
+func WithOffset(offset string) QueryParamOption {
+	return func(v url.Values) {
+		if offset != "" {
+			v.Add("offset", offset)
+		}
+	}
+}
+
+func WithNegative(negative bool) QueryParamOption {
+	return func(v url.Values) {
+		if negative {
+			v.Add("negative", "true")
+		}
+	}
+}
+
+func WithSummary(summary bool) QueryParamOption {
+	return func(v url.Values) {
+		if summary {
+			v.Add("summary", "true")
+		}
+	}
 }
