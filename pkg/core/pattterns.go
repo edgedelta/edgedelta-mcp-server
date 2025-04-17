@@ -97,7 +97,7 @@ func patternStats(client *Client) (tool mcp.Tool, handler server.ToolHandlerFunc
 				WithSummary(summary),
 			}
 
-			result, err := client.GetLogs(opts...)
+			result, err := client.GetPatternStats(opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to search users: %w", err)
 			}

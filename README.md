@@ -40,7 +40,7 @@ docker build -t mcp/edgedelta -f Dockerfile .
         "ED_ORG_ID",
         "-e",
         "ED_API_TOKEN",
-        "mcp/edgedelta"
+        "ghcr.io/edgedelta/edgedelta-mcp-server:latest"
       ],
       "env": {
         "ED_API_TOKEN": "<YOUR_TOKEN>",
