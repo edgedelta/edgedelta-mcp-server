@@ -40,6 +40,10 @@ type EventResponse struct {
 	NextCursor string       `json:"next_cursor"`
 }
 
+type PatternStatsResponse struct {
+	Stats []*PatternStats `json:"stats"`
+}
+
 type PatternStats struct {
 	// Pattern of the cluster
 	Pattern string `json:"pattern"`

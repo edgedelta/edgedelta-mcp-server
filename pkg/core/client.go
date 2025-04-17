@@ -123,3 +123,30 @@ func (c *Client) GetEvents(opts ...QueryParamOption) (*EventResponse, error) {
 	}
 	return &records, nil
 }
+
+func (c *Client) GetPatternStats(opts ...QueryParamOption) (*PatternStatsResponse, error) {
+	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", c.apiBaseURL, c.orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := c.createRequest(url, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pattern stats query, err: %v", err)
+	}
+	resp, err := c.cl.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
+	}
+
+	records := PatternStatsResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
+		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
+	}
+	return &records, nil
+}
