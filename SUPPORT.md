@@ -6,7 +6,7 @@ This project uses Edge Delta issues to track bugs and feature requests. Please s
 
 For help or questions about using this project, please open an issue.
 
-- The `edgedelta-mcp-server` is under active development and maintained by Edge DElta staff **AND THE COMMUNITY**. We will do our best to respond to support, feature requests, and community questions in a timely manner.
+- The `edgedelta-mcp-server` is under active development and maintained by Edge Delta staff **AND THE COMMUNITY**. We will do our best to respond to support, feature requests, and community questions in a timely manner.
 
 ## Edge Delta Support Policy
 
