@@ -96,7 +96,13 @@ func runStdioServer(cfg runConfig) error {
 	if token == "" {
 		return fmt.Errorf("ED_API_TOKEN not set")
 	}
-	edClient := core.NewClient(orgID, "https://api.edgedelta.com", token)
+
+	apiURL := os.Getenv("ED_API_URL")
+	if apiURL == "" {
+		apiURL = "https://api.edgedelta.com"
+	}
+
+	edClient := core.NewClient(orgID, apiURL, token)
 
 	// Create
 	edServer := core.NewServer(edClient, version)

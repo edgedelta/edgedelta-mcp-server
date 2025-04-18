@@ -1,27 +1,55 @@
 # Edge Delta MCP Server
 
-The Edge Delta MCP Server is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
+The **Edge Delta MCP Server** is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
 server that provides seamless integration with Edge Delta APIs, enabling advanced
 automation and interaction capabilities for developers and tools.
 
-## Use Cases
+## Use Cases
 
-- Extracting and analyzing data from Edge Delta.
-- Building AI powered tools and applications that interact with Edge Delta's observability.
+- Extract and analyse observability data from Edge Delta.
+- Build AI‑powered tools and applications that interact with Edge Delta’s platform.
 
 ## Prerequisites
 
-1. To run the server in a container, you will need to have [Docker](https://www.docker.com/) installed.
-2. Once Docker is installed, you will also need to ensure Docker is running.
-3. You will need to [Create a Edge Delta API Token](https://docs.edgedelta.com/api-tokens/). The MCP server can use many of the Edge Delta APIs, you will need to grant necessary access to API token.
-4. You will need to [Fetch the organization id](https://docs.edgedelta.com/my-organization/)
+1. **Docker Engine ≥ 20.10** installed *and running*.
+2. **Docker Buildx plug‑in** available:
+   - **macOS / Windows** – included with Docker Desktop.
+   - **Debian / Ubuntu**
+     ```bash
+     sudo apt-get update && sudo apt-get install -y docker-buildx-plugin
+     ```
+   - **Fedora / RHEL / CentOS**
+     ```bash
+     sudo dnf install -y docker-buildx-plugin   # or yum install …
+     ```
+   - **Other distros (manual fallback)**
+     ```bash
+     mkdir -p ~/.docker/cli-plugins
+     curl -sSL \
+       https://github.com/docker/buildx/releases/latest/download/buildx-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64 \
+       -o ~/.docker/cli-plugins/docker-buildx
+     chmod +x ~/.docker/cli-plugins/docker-buildx
+     ```
+3. An **Edge Delta API token** with the required scope – [create one here](https://docs.edgedelta.com/api-tokens/).
+4. Your **Edge Delta organisation ID** – [find it here](https://docs.edgedelta.com/my-organization/).
 
-## Build
+## Build (container image)
 
-Build mcp docker container.
+First‑time setup (creates a multi‑platform builder and boots it):
+
+```bash
+docker buildx create --name edgedelta-builder --use
+docker buildx inspect --bootstrap
 ```
-docker build -t mcp/edgedelta -f Dockerfile .
+
+Build the image and load it into the local Docker daemon:
+
+```bash
+docker buildx build --load -t mcp/edgedelta .
 ```
+
+> ℹ️  The `--load` flag streams the image back to your local Docker engine so you can
+> run it directly with `docker run mcp/edgedelta …`.
 
 ## Installation
 
@@ -36,10 +64,8 @@ docker build -t mcp/edgedelta -f Dockerfile .
         "run",
         "-i",
         "--rm",
-        "-e",
-        "ED_ORG_ID",
-        "-e",
-        "ED_API_TOKEN",
+        "-e ED_ORG_ID",
+        "-e ED_API_TOKEN",
         "ghcr.io/edgedelta/edgedelta-mcp-server:latest"
       ],
       "env": {
@@ -51,11 +77,13 @@ docker build -t mcp/edgedelta -f Dockerfile .
 }
 ```
 
-
 ## Library Usage
 
-The exported Go API of this module should currently be considered unstable, and subject to breaking changes. In the future, we may offer stability; please file an issue if there is a use case where this would be valuable.
+The exported Go API of this module is **experimental** and may change without notice.
+If you rely on it in production, please open an issue describing your use case so we
+can stabilise the relevant surface.
 
 ## License
 
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE) for the full terms.
+Licensed under the terms of the **MIT** licence. See [LICENSE](./LICENSE) for full details.
+
