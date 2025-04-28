@@ -6,8 +6,6 @@ name: Docker
 # documentation.
 
 on:
-  schedule:
-    - cron: "27 0 * * *"
   push:
     branches: ["main"]
     # Publish semver tags as releases.
@@ -67,16 +65,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=tag
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=sha
-            type=edge
-            # Custom rule to prevent pre-releases from getting latest tag
+            # For pull requests, only create pr-{number} tag
+            type=ref,event=pr
+            # For tagged releases (v1.2.3), create version tag
+            type=semver,pattern={{version}}
+            # Only set latest tag for stable version releases. v1.2.3 -> will get the latest tag AND v1.2.3-rc.1 -> will NOT get the latest tag
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
       - name: Go Build Cache for Docker
