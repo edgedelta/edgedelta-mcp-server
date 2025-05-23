@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -53,7 +54,7 @@ func NewClient(orgID string, apiBaseURL string, bearerToken string) *Client {
 	}
 }
 
-func (c *Client) createRequest(reqUrl *url.URL, opts ...QueryParamOption) (*http.Request, error) {
+func (c *Client) createRequest(ctx context.Context, reqUrl *url.URL, opts ...QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -61,7 +62,7 @@ func (c *Client) createRequest(reqUrl *url.URL, opts ...QueryParamOption) (*http
 
 	reqUrl.RawQuery = queryValues.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, reqUrl.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -70,13 +71,13 @@ func (c *Client) createRequest(reqUrl *url.URL, opts ...QueryParamOption) (*http
 	return req, nil
 }
 
-func (c *Client) GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error) {
+func (c *Client) GetLogs(ctx context.Context, opts ...QueryParamOption) (*LogSearchResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	req, err := c.createRequest(ctx, url, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log_search search query, err: %v", err)
 	}
@@ -97,13 +98,13 @@ func (c *Client) GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error) {
 	return &records, nil
 }
 
-func (c *Client) GetEvents(opts ...QueryParamOption) (*EventResponse, error) {
+func (c *Client) GetEvents(ctx context.Context, opts ...QueryParamOption) (*EventResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	req, err := c.createRequest(ctx, url, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events search query, err: %v", err)
 	}
@@ -124,13 +125,13 @@ func (c *Client) GetEvents(opts ...QueryParamOption) (*EventResponse, error) {
 	return &records, nil
 }
 
-func (c *Client) GetPatternStats(opts ...QueryParamOption) (*PatternStatsResponse, error) {
+func (c *Client) GetPatternStats(ctx context.Context, opts ...QueryParamOption) (*PatternStatsResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	req, err := c.createRequest(ctx, url, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pattern stats query, err: %v", err)
 	}
