@@ -22,6 +22,7 @@ mcpcurl --stdio-server-cmd="<command to start MCP server>" <command> [flags]
 ```
 
 The `--stdio-server-cmd` flag is required for all commands and specifies the command to run the MCP server.
+Only the `docker` and `edgedelta-mcp-server` executables are supported, and the command string must not contain shell metacharacters such as `|`, `;`, or `&`.
 
 ### Available Commands
 
@@ -50,7 +51,7 @@ Flags:
 
 Global Flags:
       --pretty                    Pretty print MCP response (only for JSON responses) (default true)
-      --stdio-server-cmd string   Shell command to invoke MCP server via stdio (required)
+      --stdio-server-cmd string   Command to invoke MCP server via stdio (docker or edgedelta-mcp-server) (required)
 
 Use "mcpcurl tools [command] --help" for more information about a command.
 ```
@@ -76,7 +77,7 @@ Flags:
 
 Global Flags:
       --pretty                    Pretty print MCP response (only for JSON responses) (default true)
-      --stdio-server-cmd string   Shell command to invoke MCP server via stdio (required)
+      --stdio-server-cmd string   Command to invoke MCP server via stdio (docker or edgedelta-mcp-server) (required)
 ```
 
 Use one of the tools:

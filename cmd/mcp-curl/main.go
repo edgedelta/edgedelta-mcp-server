@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -151,13 +152,20 @@ var (
 		Short: "Access available tools",
 		Long:  "Contains all dynamically generated tool commands from the schema",
 	}
+
+	// allowedExecutables defines commands permitted to start the MCP server
+	allowedExecutables = []string{"docker", "edgedelta-mcp-server"}
 )
 
 func main() {
 	rootCmd.AddCommand(schemaCmd)
 
 	// Add global flag for stdio server command
-	rootCmd.PersistentFlags().String("stdio-server-cmd", "", "Shell command to invoke MCP server via stdio (required)")
+	rootCmd.PersistentFlags().String(
+		"stdio-server-cmd",
+		"",
+		"Command to invoke MCP server via stdio (docker or edgedelta-mcp-server, no shell metacharacters) (required)",
+	)
 	_ = rootCmd.MarkPersistentFlagRequired("stdio-server-cmd")
 
 	// Add global flag for pretty printing
@@ -373,11 +381,12 @@ func buildJSONRPCRequest(method, toolName string, arguments map[string]interface
 // executeServerCommand runs the specified command, sends the JSON request to stdin,
 // and returns the response from stdout
 func executeServerCommand(cmdStr, jsonRequest string) (string, error) {
+	if err := validateServerCommand(cmdStr); err != nil {
+		return "", err
+	}
+
 	// Split the command string into command and arguments
 	cmdParts := strings.Fields(cmdStr)
-	if len(cmdParts) == 0 {
-		return "", fmt.Errorf("empty command")
-	}
 
 	cmd := exec.Command(cmdParts[0], cmdParts[1:]...) //nolint:gosec //mcpcurl is a test command that needs to execute arbitrary shell commands
 
@@ -409,6 +418,28 @@ func executeServerCommand(cmdStr, jsonRequest string) (string, error) {
 	}
 
 	return stdout.String(), nil
+}
+
+// validateServerCommand ensures the command only runs allowed executables and
+// does not contain shell metacharacters that could be used for injection.
+func validateServerCommand(cmdStr string) error {
+	cmdParts := strings.Fields(cmdStr)
+	if len(cmdParts) == 0 {
+		return fmt.Errorf("empty command")
+	}
+
+	execName := filepath.Base(cmdParts[0])
+	if !slices.Contains(allowedExecutables, execName) {
+		return fmt.Errorf("command %q is not allowed", execName)
+	}
+
+	for _, part := range cmdParts {
+		if strings.ContainsAny(part, "|;&><`()") {
+			return fmt.Errorf("disallowed characters in command")
+		}
+	}
+
+	return nil
 }
 
 func printResponse(response string, prettyPrint bool) error {
