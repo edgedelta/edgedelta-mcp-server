@@ -11,7 +11,8 @@ ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 
 # Required for establishing https calls
-RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
+RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates \
+    && adduser -D -u 10001 appuser
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
@@ -22,6 +23,9 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
    -o edgedelta-mcp-server ./cmd/mcp-server/main.go
 
 FROM scratch
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /app/edgedelta-mcp-server /edgedelta-mcp-server
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+COPY --from=builder --chown=10001:10001 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder --chown=10001:10001 /app/edgedelta-mcp-server /edgedelta-mcp-server
+USER 10001:10001
 CMD ["/edgedelta-mcp-server", "stdio"]
