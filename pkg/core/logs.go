@@ -80,7 +80,7 @@ func logSearch(client *Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 
 			result, err := client.GetLogs(opts...)
 			if err != nil {
-				return nil, fmt.Errorf("failed to search users: %w", err)
+				return nil, fmt.Errorf("failed to search logs: %w", err)
 			}
 
 			r, err := json.Marshal(result)
