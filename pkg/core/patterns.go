@@ -10,7 +10,7 @@ import (
 )
 
 // patternStats creates a tool returning log pattern statistics.
-func patternStats(client *Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+func patternStats(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("pattern_stats",
 			mcp.WithDescription("Returns top log patterns (signatures of log messages) and their stats; count, proportion, sentiment and delta."),
 			mcp.WithString("query",

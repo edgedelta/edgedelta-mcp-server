@@ -1,4 +1,4 @@
-package core
+package http
 
 import (
 	"crypto/tls"
@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/core"
 )
 
 var (
@@ -37,15 +39,15 @@ var (
 	}
 )
 
-type Client struct {
+type HTTPClient struct {
 	orgID       string
 	bearerToken string
 	apiBaseURL  string
 	cl          *http.Client
 }
 
-func NewClient(orgID string, apiBaseURL string, bearerToken string) *Client {
-	return &Client{
+func NewClient(orgID string, apiBaseURL string, bearerToken string) *HTTPClient {
+	return &HTTPClient{
 		orgID:       orgID,
 		bearerToken: bearerToken,
 		apiBaseURL:  apiBaseURL,
@@ -53,7 +55,7 @@ func NewClient(orgID string, apiBaseURL string, bearerToken string) *Client {
 	}
 }
 
-func (c *Client) createRequest(reqUrl *url.URL, opts ...QueryParamOption) (*http.Request, error) {
+func (c *HTTPClient) createRequest(reqUrl *url.URL, opts ...core.QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -70,7 +72,7 @@ func (c *Client) createRequest(reqUrl *url.URL, opts ...QueryParamOption) (*http
 	return req, nil
 }
 
-func (c *Client) GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error) {
+func (c *HTTPClient) GetLogs(opts ...core.QueryParamOption) (*core.LogSearchResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
@@ -90,14 +92,14 @@ func (c *Client) GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error) {
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := LogSearchResponse{}
+	records := core.LogSearchResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
 }
 
-func (c *Client) GetEvents(opts ...QueryParamOption) (*EventResponse, error) {
+func (c *HTTPClient) GetEvents(opts ...core.QueryParamOption) (*core.EventResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
@@ -117,14 +119,14 @@ func (c *Client) GetEvents(opts ...QueryParamOption) (*EventResponse, error) {
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := EventResponse{}
+	records := core.EventResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
 }
 
-func (c *Client) GetPatternStats(opts ...QueryParamOption) (*PatternStatsResponse, error) {
+func (c *HTTPClient) GetPatternStats(opts ...core.QueryParamOption) (*core.PatternStatsResponse, error) {
 	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", c.apiBaseURL, c.orgID))
 	if err != nil {
 		return nil, err
@@ -144,7 +146,7 @@ func (c *Client) GetPatternStats(opts ...QueryParamOption) (*PatternStatsRespons
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := PatternStatsResponse{}
+	records := core.PatternStatsResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}

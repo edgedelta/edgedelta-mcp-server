@@ -131,3 +131,21 @@ func WithSummary(summary bool) QueryParamOption {
 		}
 	}
 }
+
+// Client defines the methods required for interacting with Edge Delta services.
+// It can be implemented with different transports (e.g. HTTP, Mock, GRPC).
+//
+// Example implementations:
+//   - HTTPClient: Uses HTTP REST API (provided in this package)
+//   - MockClient: For testing (implement this interface in your test package)
+//
+// Usage:
+//
+//	// Using the built-in HTTP client
+//	httpClient := core.NewClient(orgID, apiURL, token)
+//	server := core.NewServer(httpClient, version)
+type Client interface {
+	GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error)
+	GetEvents(opts ...QueryParamOption) (*EventResponse, error)
+	GetPatternStats(opts ...QueryParamOption) (*PatternStatsResponse, error)
+}
