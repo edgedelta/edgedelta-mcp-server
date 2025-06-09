@@ -10,7 +10,7 @@ import (
 )
 
 // eventsSearch creates a tool to search for events.
-func eventsSearch(client *Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+func eventsSearch(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("events_search",
 			mcp.WithDescription("Search for Edge Delta events"),
 			mcp.WithString("query",

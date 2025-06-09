@@ -8,7 +8,7 @@ import (
 )
 
 // NewServer creates a new Edge Delta MCP server with the specified Edge Delta client and logger.
-func NewServer(client *Client, version string) *server.MCPServer {
+func NewServer(client Client, version string) *server.MCPServer {
 	// Create a new MCP server
 	s := server.NewMCPServer(
 		"edgedelta-mcp-server",

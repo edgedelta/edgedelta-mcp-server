@@ -11,7 +11,7 @@ import (
 )
 
 // anomalySearch creates a tool to search for anomaly events.
-func anomalySearch(client *Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+func anomalySearch(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("anomaly_search",
 			mcp.WithDescription("Search for Edge Delta anomaly events"),
 			mcp.WithString("query",

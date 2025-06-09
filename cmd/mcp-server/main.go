@@ -12,6 +12,7 @@ import (
 	"log/slog"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/core"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/http"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -102,7 +103,7 @@ func runStdioServer(cfg runConfig) error {
 		apiURL = "https://api.edgedelta.com"
 	}
 
-	edClient := core.NewClient(orgID, apiURL, token)
+	edClient := http.NewClient(orgID, apiURL, token)
 
 	// Create
 	edServer := core.NewServer(edClient, version)
