@@ -50,7 +50,7 @@ func NewClient() *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) createRequest(reqUrl *url.URL, token string, opts ...core.QueryParamOption) (*http.Request, error) {
+func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...core.QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -58,7 +58,7 @@ func (c *HTTPClient) createRequest(reqUrl *url.URL, token string, opts ...core.Q
 
 	reqUrl.RawQuery = queryValues.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, reqUrl.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption)
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, token, opts...)
+	req, err := c.createRequest(ctx, url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log_search search query, err: %v", err)
 	}
@@ -110,7 +110,7 @@ func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOptio
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, token, opts...)
+	req, err := c.createRequest(ctx, url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events search query, err: %v", err)
 	}
@@ -141,7 +141,7 @@ func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryPara
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, token, opts...)
+	req, err := c.createRequest(ctx, url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pattern stats query, err: %v", err)
 	}
