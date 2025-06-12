@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// eventsSearch creates a tool to search for events.
-func eventsSearch(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+// EventsSearchTool creates a tool to search for events.
+func EventsSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("events_search",
 			mcp.WithDescription("Search for Edge Delta events"),
 			mcp.WithString("query",
