@@ -107,9 +107,9 @@ func runStdioServer(cfg runConfig) error {
 	edServer := core.NewServer(http.NewClient(), version)
 	stdioServer := server.NewStdioServer(edServer)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
-		ctx = context.WithValue(ctx, "orgID", orgID)
-		ctx = context.WithValue(ctx, "token", token)
-		ctx = context.WithValue(ctx, "apiURL", apiURL)
+		ctx = context.WithValue(ctx, core.OrgIDKey, orgID)
+		ctx = context.WithValue(ctx, core.TokenKey, token)
+		ctx = context.WithValue(ctx, core.APIURLKey, apiURL)
 		return ctx
 	})
 

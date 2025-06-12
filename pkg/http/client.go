@@ -68,7 +68,7 @@ func (c *HTTPClient) createRequest(reqUrl *url.URL, token string, opts ...core.Q
 }
 
 func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption) (*core.LogSearchResponse, error) {
-	apiURL, orgID, token, err := fetchContextKeys(ctx)
+	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption)
 }
 
 func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOption) (*core.EventResponse, error) {
-	apiURL, orgID, token, err := fetchContextKeys(ctx)
+	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOptio
 }
 
 func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryParamOption) (*core.PatternStatsResponse, error) {
-	apiURL, orgID, token, err := fetchContextKeys(ctx)
+	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,20 +160,4 @@ func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryPara
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
-}
-
-func fetchContextKeys(ctx context.Context) (string, string, string, error) {
-	apiURL, ok := ctx.Value("apiURL").(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("apiURL not found in context")
-	}
-	orgID, ok := ctx.Value("orgID").(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("orgID not found in context")
-	}
-	token, ok := ctx.Value("token").(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("token not found in context")
-	}
-	return apiURL, orgID, token, nil
 }
