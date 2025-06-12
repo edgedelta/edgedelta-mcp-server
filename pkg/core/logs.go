@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// logSearch creates a tool to search for logs.
-func logSearch(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+// LogSearchTool creates a tool to search for logs.
+func LogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("log_search",
 			mcp.WithDescription("Search for Edge Delta logs"),
 			mcp.WithString("query",

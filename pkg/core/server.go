@@ -16,10 +16,10 @@ func NewServer(client Client, version string) *server.MCPServer {
 		server.WithResourceCapabilities(true, true),
 		server.WithLogging())
 
-	s.AddTool(logSearch(client))
-	s.AddTool(eventsSearch(client))
-	s.AddTool(anomalySearch(client))
-	s.AddTool(patternStats(client))
+	s.AddTool(LogSearchTool(client))
+	s.AddTool(EventsSearchTool(client))
+	s.AddTool(AnomalySearchTool(client))
+	s.AddTool(PatternStatsTool(client))
 	return s
 }
 
