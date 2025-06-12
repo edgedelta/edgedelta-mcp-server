@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -40,22 +41,16 @@ var (
 )
 
 type HTTPClient struct {
-	orgID       string
-	bearerToken string
-	apiBaseURL  string
-	cl          *http.Client
+	cl *http.Client
 }
 
-func NewClient(orgID string, apiBaseURL string, bearerToken string) *HTTPClient {
+func NewClient() *HTTPClient {
 	return &HTTPClient{
-		orgID:       orgID,
-		bearerToken: bearerToken,
-		apiBaseURL:  apiBaseURL,
-		cl:          newHTTPClientFunc(),
+		cl: newHTTPClientFunc(),
 	}
 }
 
-func (c *HTTPClient) createRequest(reqUrl *url.URL, opts ...core.QueryParamOption) (*http.Request, error) {
+func (c *HTTPClient) createRequest(reqUrl *url.URL, token string, opts ...core.QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -68,17 +63,22 @@ func (c *HTTPClient) createRequest(reqUrl *url.URL, opts ...core.QueryParamOptio
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", c.bearerToken)
+	req.Header.Add("X-ED-API-Token", token)
 	return req, nil
 }
 
-func (c *HTTPClient) GetLogs(opts ...core.QueryParamOption) (*core.LogSearchResponse, error) {
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", c.apiBaseURL, c.orgID))
+func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption) (*core.LogSearchResponse, error) {
+	apiURL, orgID, token, err := fetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := c.createRequest(url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log_search search query, err: %v", err)
 	}
@@ -99,13 +99,18 @@ func (c *HTTPClient) GetLogs(opts ...core.QueryParamOption) (*core.LogSearchResp
 	return &records, nil
 }
 
-func (c *HTTPClient) GetEvents(opts ...core.QueryParamOption) (*core.EventResponse, error) {
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", c.apiBaseURL, c.orgID))
+func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOption) (*core.EventResponse, error) {
+	apiURL, orgID, token, err := fetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := c.createRequest(url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create events search query, err: %v", err)
 	}
@@ -126,13 +131,17 @@ func (c *HTTPClient) GetEvents(opts ...core.QueryParamOption) (*core.EventRespon
 	return &records, nil
 }
 
-func (c *HTTPClient) GetPatternStats(opts ...core.QueryParamOption) (*core.PatternStatsResponse, error) {
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", c.apiBaseURL, c.orgID))
+func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryParamOption) (*core.PatternStatsResponse, error) {
+	apiURL, orgID, token, err := fetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", apiURL, orgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := c.createRequest(url, opts...)
+	req, err := c.createRequest(url, token, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pattern stats query, err: %v", err)
 	}
@@ -151,4 +160,20 @@ func (c *HTTPClient) GetPatternStats(opts ...core.QueryParamOption) (*core.Patte
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
+}
+
+func fetchContextKeys(ctx context.Context) (string, string, string, error) {
+	apiURL, ok := ctx.Value("apiURL").(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("apiURL not found in context")
+	}
+	orgID, ok := ctx.Value("orgID").(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("orgID not found in context")
+	}
+	token, ok := ctx.Value("token").(string)
+	if !ok {
+		return "", "", "", fmt.Errorf("token not found in context")
+	}
+	return apiURL, orgID, token, nil
 }

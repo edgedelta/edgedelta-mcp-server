@@ -95,7 +95,7 @@ func AnomalySearchTool(client Client) (tool mcp.Tool, handler server.ToolHandler
 				WithFromTo(from, to),
 			}
 
-			result, err := client.GetEvents(opts...) // Use GetEvents as it's still event search
+			result, err := client.GetEvents(ctx, opts...) // Use GetEvents as it's still event search
 			if err != nil {
 				// Consider more specific error handling if needed
 				return nil, fmt.Errorf("failed to search anomaly events: %w", err)
