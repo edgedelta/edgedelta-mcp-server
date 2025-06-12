@@ -78,7 +78,7 @@ func EventsSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				WithFromTo(from, to),
 			}
 
-			result, err := client.GetEvents(opts...)
+			result, err := client.GetEvents(ctx, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to search events: %w", err)
 			}

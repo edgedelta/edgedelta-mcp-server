@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"net/url"
 )
 
@@ -142,10 +143,10 @@ func WithSummary(summary bool) QueryParamOption {
 // Usage:
 //
 //	// Using the built-in HTTP client
-//	httpClient := core.NewClient(orgID, apiURL, token)
+//	httpClient := core.NewClient()
 //	server := core.NewServer(httpClient, version)
 type Client interface {
-	GetLogs(opts ...QueryParamOption) (*LogSearchResponse, error)
-	GetEvents(opts ...QueryParamOption) (*EventResponse, error)
-	GetPatternStats(opts ...QueryParamOption) (*PatternStatsResponse, error)
+	GetLogs(ctx context.Context, opts ...QueryParamOption) (*LogSearchResponse, error)
+	GetEvents(ctx context.Context, opts ...QueryParamOption) (*EventResponse, error)
+	GetPatternStats(ctx context.Context, opts ...QueryParamOption) (*PatternStatsResponse, error)
 }

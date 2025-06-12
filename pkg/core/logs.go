@@ -78,7 +78,7 @@ func LogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc
 				WithFromTo(from, to),
 			}
 
-			result, err := client.GetLogs(opts...)
+			result, err := client.GetLogs(ctx, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to search logs: %w", err)
 			}

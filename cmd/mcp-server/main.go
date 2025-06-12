@@ -103,11 +103,15 @@ func runStdioServer(cfg runConfig) error {
 		apiURL = "https://api.edgedelta.com"
 	}
 
-	edClient := http.NewClient(orgID, apiURL, token)
-
 	// Create
-	edServer := core.NewServer(edClient, version)
+	edServer := core.NewServer(http.NewClient(), version)
 	stdioServer := server.NewStdioServer(edServer)
+	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
+		ctx = context.WithValue(ctx, "orgID", orgID)
+		ctx = context.WithValue(ctx, "token", token)
+		ctx = context.WithValue(ctx, "apiURL", apiURL)
+		return ctx
+	})
 
 	// Start listening for messages
 	errC := make(chan error, 1)
