@@ -11,8 +11,7 @@ import (
 
 	"log/slog"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/core"
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/http"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -104,12 +103,12 @@ func runStdioServer(cfg runConfig) error {
 	}
 
 	// Create
-	edServer := core.NewServer(http.NewClient(), version)
+	edServer := tools.NewServer(tools.NewHTTPlient(), version)
 	stdioServer := server.NewStdioServer(edServer)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
-		ctx = context.WithValue(ctx, core.OrgIDKey, orgID)
-		ctx = context.WithValue(ctx, core.TokenKey, token)
-		ctx = context.WithValue(ctx, core.APIURLKey, apiURL)
+		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
+		ctx = context.WithValue(ctx, tools.TokenKey, token)
+		ctx = context.WithValue(ctx, tools.APIURLKey, apiURL)
 		return ctx
 	})
 

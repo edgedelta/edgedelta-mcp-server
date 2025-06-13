@@ -1,4 +1,4 @@
-package http
+package tools
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/core"
 )
 
 var (
@@ -44,13 +42,13 @@ type HTTPClient struct {
 	cl *http.Client
 }
 
-func NewClient() *HTTPClient {
+func NewHTTPlient() *HTTPClient {
 	return &HTTPClient{
 		cl: newHTTPClientFunc(),
 	}
 }
 
-func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...core.QueryParamOption) (*http.Request, error) {
+func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -67,8 +65,8 @@ func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token s
 	return req, nil
 }
 
-func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption) (*core.LogSearchResponse, error) {
-	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
+func (c *HTTPClient) GetLogs(ctx context.Context, opts ...QueryParamOption) (*LogSearchResponse, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -92,15 +90,15 @@ func (c *HTTPClient) GetLogs(ctx context.Context, opts ...core.QueryParamOption)
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := core.LogSearchResponse{}
+	records := LogSearchResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
 }
 
-func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOption) (*core.EventResponse, error) {
-	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
+func (c *HTTPClient) GetEvents(ctx context.Context, opts ...QueryParamOption) (*EventResponse, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,15 +122,15 @@ func (c *HTTPClient) GetEvents(ctx context.Context, opts ...core.QueryParamOptio
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := core.EventResponse{}
+	records := EventResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
 	return &records, nil
 }
 
-func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryParamOption) (*core.PatternStatsResponse, error) {
-	apiURL, orgID, token, err := core.FetchContextKeys(ctx)
+func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...QueryParamOption) (*PatternStatsResponse, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +153,7 @@ func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...core.QueryPara
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
 
-	records := core.PatternStatsResponse{}
+	records := PatternStatsResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
 		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
 	}
