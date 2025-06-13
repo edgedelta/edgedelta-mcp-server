@@ -1,21 +1,20 @@
-package core
+package tools
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AnomalySearchTool creates a tool to search for anomaly events.
-func AnomalySearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("anomaly_search",
-			mcp.WithDescription("Search for Edge Delta anomaly events"),
+// EventsSearchTool creates a tool to search for events.
+func EventsSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("events_search",
+			mcp.WithDescription("Search for Edge Delta events"),
 			mcp.WithString("query",
-				mcp.Description("Search query using Edge Delta events search syntax (will be combined with event.type:pattern_anomaly)"),
+				mcp.Description("Search query using Edge Delta events search syntax"),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("limit",
@@ -41,7 +40,7 @@ func AnomalySearchTool(client Client) (tool mcp.Tool, handler server.ToolHandler
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			userQuery, err := optionalParam[string](request, "query")
+			query, err := optionalParam[string](request, "query")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -70,24 +69,8 @@ func AnomalySearchTool(client Client) (tool mcp.Tool, handler server.ToolHandler
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			// Construct the final query
-			finalQuery := "event.type:pattern_anomaly"
-			if userQuery != "" {
-				// Ensure user query doesn't override the event type if they try to add it
-				cleanedUserQuery := strings.ReplaceAll(userQuery, "event.type:pattern_anomaly", "")
-				// Remove potential leading/trailing spaces or AND operators
-				cleanedUserQuery = strings.TrimSpace(cleanedUserQuery)
-				cleanedUserQuery = strings.TrimPrefix(cleanedUserQuery, "AND ")
-				cleanedUserQuery = strings.TrimSuffix(cleanedUserQuery, " AND")
-				cleanedUserQuery = strings.TrimSpace(cleanedUserQuery)
-
-				if cleanedUserQuery != "" {
-					finalQuery = fmt.Sprintf("%s AND (%s)", finalQuery, cleanedUserQuery)
-				}
-			}
-
 			opts := []QueryParamOption{
-				WithQuery(finalQuery), // Use the combined query
+				WithQuery(query),
 				WithOrder(order),
 				WithLimit(limit),
 				WithCursor(cursor),
@@ -95,15 +78,14 @@ func AnomalySearchTool(client Client) (tool mcp.Tool, handler server.ToolHandler
 				WithFromTo(from, to),
 			}
 
-			result, err := client.GetEvents(ctx, opts...) // Use GetEvents as it's still event search
+			result, err := client.GetEvents(ctx, opts...)
 			if err != nil {
-				// Consider more specific error handling if needed
-				return nil, fmt.Errorf("failed to search anomaly events: %w", err)
+				return nil, fmt.Errorf("failed to search events: %w", err)
 			}
 
 			r, err := json.Marshal(result)
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal anomaly search response: %w", err)
+				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
 
 			return mcp.NewToolResultText(string(r)), nil
