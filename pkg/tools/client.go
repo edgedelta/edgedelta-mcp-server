@@ -1,13 +1,9 @@
 package tools
 
 import (
-	"context"
 	"crypto/tls"
-	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -48,114 +44,10 @@ func NewHTTPlient() *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
-	queryValues := url.Values{}
-	for _, opt := range opts {
-		opt(queryValues)
-	}
-
-	reqUrl.RawQuery = queryValues.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
-	return req, nil
+func (c *HTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return c.cl.Do(req)
 }
 
-func (c *HTTPClient) GetLogs(ctx context.Context, opts ...QueryParamOption) (*LogSearchResponse, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", apiURL, orgID))
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := c.createRequest(ctx, url, token, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create log_search search query, err: %v", err)
-	}
-	resp, err := c.cl.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
-	}
-
-	records := LogSearchResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
-		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
-	}
-	return &records, nil
-}
-
-func (c *HTTPClient) GetEvents(ctx context.Context, opts ...QueryParamOption) (*EventResponse, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", apiURL, orgID))
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := c.createRequest(ctx, url, token, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create events search query, err: %v", err)
-	}
-	resp, err := c.cl.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
-	}
-
-	records := EventResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
-		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
-	}
-	return &records, nil
-}
-
-func (c *HTTPClient) GetPatternStats(ctx context.Context, opts ...QueryParamOption) (*PatternStatsResponse, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-	url, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", apiURL, orgID))
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := c.createRequest(ctx, url, token, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pattern stats query, err: %v", err)
-	}
-	resp, err := c.cl.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
-	}
-
-	records := PatternStatsResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
-		return nil, fmt.Errorf("failed to decode body into json for url: %s, err: %v", req.URL.RequestURI(), err)
-	}
-	return &records, nil
+func (c *HTTPClient) Get(url string) (*http.Response, error) {
+	return c.cl.Get(url)
 }
