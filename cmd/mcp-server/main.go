@@ -109,7 +109,7 @@ func runStdioServer(cfg runConfig) error {
 	}
 
 	// Create auto-sync OpenAPI server with AI tag filtering
-	cfg.logger.Info("Starting EdgeDelta MCP Server with derived from swagger doc, %s")
+	cfg.logger.Info("Starting EdgeDelta MCP Server with derived from swagger doc", "url", swaggerDocURL)
 
 	edServer, err := tools.CreateServer(version, swaggerDocURL, apiURL, allowedTags)
 	if err != nil {

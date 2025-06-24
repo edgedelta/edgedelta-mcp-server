@@ -115,7 +115,7 @@ func (s *Server) retrieveOpenAPISpec(url string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status.code: %d when fetching URL, err: %w", resp.StatusCode, err)
+		return nil, fmt.Errorf("unexpected response status code: %d when fetching URL", resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)
