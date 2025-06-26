@@ -270,32 +270,25 @@ func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Paramet
 		paramType = param.Schema.Type
 	}
 
+	propertyOpts := []mcp.PropertyOption{mcp.Description(paramDesc)}
+	if param.Required {
+		propertyOpts = append(propertyOpts, mcp.Required())
+	}
+
 	// Add parameter based on type
 	switch paramType {
 	case "string":
 		if param.Schema != nil && len(param.Schema.Enum) > 0 {
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-				mcp.Description(paramDesc),
-				mcp.Enum(param.Schema.Enum...),
-			))
-		} else {
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-				mcp.Description(paramDesc),
-			))
+			propertyOpts = append(propertyOpts, mcp.Enum(param.Schema.Enum...))
 		}
+		*toolOptions = append(*toolOptions, mcp.WithString(paramName, propertyOpts...))
 	case "integer", "number":
-		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName, propertyOpts...))
 	case "boolean":
-		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName, propertyOpts...))
 	default:
 		// Default to string for unknown types
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithString(paramName, propertyOpts...))
 	}
 }
 
