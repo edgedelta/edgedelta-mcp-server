@@ -52,7 +52,7 @@ var (
 	allowedTags = []string{"AI"}
 	// local swagger doc url
 	swaggerDocURL = "http://localhost:4445/swagger_internal/doc.json"
-	// swaggerDocURL = "https://api2.edgedelta.com/swagger/doc.json"
+	// swaggerDocURL = "https://api.staging.edgedelta.com/swagger_internal/doc.json"
 )
 
 func initLogger(outPath string) (*slog.Logger, error) {
@@ -105,7 +105,7 @@ func runStdioServer(cfg runConfig) error {
 
 	apiURL := os.Getenv("ED_API_URL")
 	if apiURL == "" {
-		apiURL = "https://api.edgedelta.com"
+		apiURL = "https://api.staging.edgedelta.com"
 	}
 
 	// Create auto-sync OpenAPI server with AI tag filtering

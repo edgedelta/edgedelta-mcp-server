@@ -66,7 +66,8 @@ type httpClient interface {
 
 // Server manages auto-syncing OpenAPI-based MCP tools
 type Server struct {
-	client        httpClient
+	httpClient    httpClient
+	client        Client
 	swaggerDocURL string
 	apiURL        string
 	allowedTags   map[string]struct{}
@@ -82,11 +83,13 @@ func newServer(swaggerDocURL, apiURL string, allowedTags []string) *Server {
 		tagMap[tag] = struct{}{}
 	}
 
+	httpClient := NewHTTPlient()
 	return &Server{
 		swaggerDocURL: swaggerDocURL,
 		allowedTags:   tagMap,
 		apiURL:        apiURL,
-		client:        NewHTTPlient(),
+		httpClient:    httpClient,
+		client:        httpClient,
 	}
 }
 
@@ -108,7 +111,7 @@ func (s *Server) LoadSpec() error {
 
 // retrieveOpenAPISpec fetches the OpenAPI specification from a URL
 func (s *Server) retrieveOpenAPISpec(url string) ([]byte, error) {
-	resp, err := s.client.Get(url)
+	resp, err := s.httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
 	}
@@ -229,6 +232,14 @@ func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Paramet
 		paramDesc = fmt.Sprintf("Parameter: %s", paramName)
 	}
 
+	// Handle body parameters
+	if param.In == "body" {
+		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+			mcp.Description(paramDesc+" (JSON payload)"),
+		))
+		return
+	}
+
 	// Get parameter type
 	paramType := param.Type
 	if paramType == "" && param.Schema != nil {
@@ -282,20 +293,44 @@ func (s *Server) executeOperation(ctx context.Context, request mcp.CallToolReque
 	// Build the full URL
 	fullURL := s.buildURL(path, args)
 
+	// Check for body parameters and prepare request body
+	var requestBody io.Reader
+	var bodyParam *Parameter
+	for _, param := range operation.Parameters {
+		if param.In == "body" {
+			bodyParam = &param
+			break
+		}
+	}
+
+	if bodyParam != nil {
+		// Get the JSON payload from arguments
+		if bodyData, exists := args[bodyParam.Name]; exists {
+			if bodyStr, ok := bodyData.(string); ok && bodyStr != "" {
+				requestBody = strings.NewReader(bodyStr)
+			}
+		}
+	}
+
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), fullURL, nil)
+	req, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), fullURL, requestBody)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to create request: %v", err)), nil
+	}
+
+	// Set Content-Type header for body requests
+	if bodyParam != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	// Add authentication headers
 	s.addAuthHeaders(req, ctx)
 
-	// Add query parameters
+	// Add query parameters (skip body parameters)
 	s.addQueryParameters(req, operation.Parameters, request)
 
 	// Execute request
-	resp, err := s.client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to execute request: %v", err)), nil
 	}
@@ -341,28 +376,31 @@ func (s *Server) addQueryParameters(req *http.Request, parameters []Parameter, r
 	query := req.URL.Query()
 
 	for _, param := range parameters {
-		if param.In == "query" {
-			// Get parameter type from param.Type or param.Schema.Type
-			paramType := param.Type
-			if paramType == "" && param.Schema != nil {
-				paramType = param.Schema.Type
-			}
+		// Skip body parameters and path parameters - only process query parameters
+		if param.In != "query" {
+			continue
+		}
 
-			// Use type-safe parameter extraction based on OpenAPI spec
-			switch paramType {
-			case "integer", "number":
-				if value, err := optionalParam[float64](request, param.Name); err == nil && value != 0 {
-					query.Add(param.Name, fmt.Sprintf("%v", value))
-				}
-			case "boolean":
-				if value, err := optionalParam[bool](request, param.Name); err == nil {
-					query.Add(param.Name, fmt.Sprintf("%t", value))
-				}
-			default:
-				// Handle string and unknown types
-				if value, err := optionalParam[string](request, param.Name); err == nil && value != "" {
-					query.Add(param.Name, value)
-				}
+		// Get parameter type from param.Type or param.Schema.Type
+		paramType := param.Type
+		if paramType == "" && param.Schema != nil {
+			paramType = param.Schema.Type
+		}
+
+		// Use type-safe parameter extraction based on OpenAPI spec
+		switch paramType {
+		case "integer", "number":
+			if value, err := optionalParam[float64](request, param.Name); err == nil && value != 0 {
+				query.Add(param.Name, fmt.Sprintf("%v", value))
+			}
+		case "boolean":
+			if value, err := optionalParam[bool](request, param.Name); err == nil {
+				query.Add(param.Name, fmt.Sprintf("%t", value))
+			}
+		default:
+			// Handle string and unknown types
+			if value, err := optionalParam[string](request, param.Name); err == nil && value != "" {
+				query.Add(param.Name, value)
 			}
 		}
 	}
@@ -385,6 +423,9 @@ func CreateServer(version, swaggerDocURL, apiURL string, allowedTags []string) (
 	for i, tool := range srv.tools {
 		s.AddTool(tool, srv.handlers[i])
 	}
+
+	// Add manual tools
+	s.AddTool(GetPipelinesTool(srv.client))
 
 	return s, nil
 }
