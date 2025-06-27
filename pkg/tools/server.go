@@ -250,29 +250,14 @@ func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Paramet
 	// Add parameter based on type
 	switch paramType {
 	case "string":
-		if param.Schema != nil && len(param.Schema.Enum) > 0 {
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-				mcp.Description(paramDesc),
-				mcp.Enum(param.Schema.Enum...),
-			))
-		} else {
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-				mcp.Description(paramDesc),
-			))
-		}
+		*toolOptions = append(*toolOptions, mcp.WithString(paramName, withParam(param)))
 	case "integer", "number":
-		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName, withParam(param)))
 	case "boolean":
-		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName, withParam(param)))
 	default:
 		// Default to string for unknown types
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-			mcp.Description(paramDesc),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithString(paramName, withParam(param)))
 	}
 }
 
@@ -459,4 +444,20 @@ func optionalParam[T any](r mcp.CallToolRequest, p string) (T, error) {
 	}
 
 	return r.GetArguments()[p].(T), nil
+}
+
+// populates schema based on the parameter definition
+func withParam(param Parameter) mcp.PropertyOption {
+	return func(schema map[string]any) {
+		if param.Description != "" {
+			param.Description = fmt.Sprintf("Parameter: %s", param.Name)
+		}
+		schema["description"] = param.Description
+		if param.Required {
+			schema["required"] = true
+		}
+		if param.Schema != nil && len(param.Schema.Enum) > 0 {
+			schema["enum"] = param.Schema.Enum
+		}
+	}
 }
