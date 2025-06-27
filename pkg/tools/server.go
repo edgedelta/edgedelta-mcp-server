@@ -175,6 +175,14 @@ func (s *Server) createToolFromOperation(path, method string, operation Operatio
 	description := getDescription(path, method, operation)
 
 	toolOptions := []mcp.ToolOption{mcp.WithDescription(description)}
+
+	// Add configuration examples information to pipeline tool descriptions
+	if isPipelineTool(toolName, operation) {
+		toolOptions = append(toolOptions, mcp.WithString("example_node_specifications",
+			mcp.Description("Example node specifications for the pipeline to how to add a node to the pipeline. Visit first to get example node specifications. You can get the example node specifications from https://release.edgedelta.com/release/all-features-v3.yml"),
+		))
+	}
+
 	for _, param := range operation.Parameters {
 		s.addParameterToTool(&toolOptions, param)
 	}
@@ -185,6 +193,22 @@ func (s *Server) createToolFromOperation(path, method string, operation Operatio
 	}
 
 	return tool, handler
+}
+
+// Helper function to identify pipeline-related tools
+func isPipelineTool(toolName string, operation Operation) bool {
+	if strings.Contains(strings.ToLower(toolName), "pipeline") {
+		return true
+	}
+
+	// Also check operation tags
+	for _, tag := range operation.Tags {
+		if strings.Contains(strings.ToLower(tag), "pipeline") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // generateToolName creates a tool name from an operation.

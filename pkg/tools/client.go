@@ -175,7 +175,7 @@ func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption)
 		})
 	}
 
-	// return the last 5 pipelines
+	// limit the number of pipelines to return
 	if len(returnPipelines) > limit {
 		return returnPipelines[:limit], nil
 	}

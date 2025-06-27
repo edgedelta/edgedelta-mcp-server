@@ -12,7 +12,7 @@ import (
 // GetPipelinesTool creates a tool to search for logs.
 func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipelines",
-			mcp.WithDescription("Get pipelines from Edge Delta for last 5 recent updated pipelines"),
+			mcp.WithDescription("Get pipelines from Edge Delta for last 5 recent updated pipelines. It is a tool to get the pipelines from Edge Delta."),
 			mcp.WithString("limit",
 				mcp.Description("Limit number of results, default is 5 and max is 10"),
 				mcp.DefaultNumber(5),
