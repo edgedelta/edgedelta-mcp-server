@@ -123,18 +123,41 @@ func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption)
 		limit = 10
 	}
 
+	forcedAdd := make(map[string]bool)
+	for _, pipeline := range pipelines {
+		if keyword != "" && strings.Contains(pipeline.Tag, keyword) {
+			forcedAdd[pipeline.ID] = true
+		}
+	}
+
 	returnPipelines := make([]PipelineSummary, 0)
 	for _, pipeline := range pipelines {
+		if forcedAdd[pipeline.ID] {
+			returnPipelines = append(returnPipelines, PipelineSummary{
+				ID:          pipeline.ID,
+				Tag:         pipeline.Tag,
+				ClusterName: pipeline.ClusterName,
+				Creator:     pipeline.Creator,
+				Created:     pipeline.Created,
+				Updater:     pipeline.Updater,
+				Updated:     pipeline.Updated,
+				Environment: pipeline.Environment,
+				FleetType:   pipeline.FleetType,
+				Status:      pipeline.Status,
+			})
+			continue
+		}
+
+		if keyword != "" && !strings.Contains(pipeline.Tag, keyword) {
+			continue
+		}
+
 		if pipeline.Status == FleetSuspended || pipeline.Updated == "" {
 			continue
 		}
 
 		// filter out not updated in last 7 days
 		if pipeline.Updated < time.Now().UTC().AddDate(0, 0, -7).Format(URLTimeFormat) {
-			continue
-		}
-
-		if keyword != "" && !strings.Contains(pipeline.Tag, keyword) {
 			continue
 		}
 
