@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	stdlog "log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +14,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	stdlog "log"
 )
 
 var version = "version"
@@ -47,6 +48,9 @@ var (
 			}
 		},
 	}
+
+	allowedTags   = []string{"AI"}
+	swaggerDocURL = "https://api.edgedelta.com/swagger/doc.json"
 )
 
 func initLogger(outPath string) (*slog.Logger, error) {
@@ -70,7 +74,7 @@ func init() {
 	// Add global flags that will be shared by all commands
 	rootCmd.PersistentFlags().String("log-file", "", "Path to log file")
 
-	// Bind flag to viper
+	// Bind flags to viper
 	_ = viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
 
 	// Add subcommands
@@ -102,8 +106,14 @@ func runStdioServer(cfg runConfig) error {
 		apiURL = "https://api.edgedelta.com"
 	}
 
-	// Create
-	edServer := tools.NewServer(tools.NewHTTPlient(), version)
+	// Create auto-sync OpenAPI server with AI tag filtering
+	cfg.logger.Info("Starting EdgeDelta MCP Server with derived from swagger doc", "url", swaggerDocURL)
+
+	edServer, err := tools.CreateServer(version, swaggerDocURL, apiURL, allowedTags)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
+
 	stdioServer := server.NewStdioServer(edServer)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
 		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
