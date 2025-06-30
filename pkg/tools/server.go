@@ -20,13 +20,16 @@ var (
 	snakeCaseRegex   = regexp.MustCompile("([a-z0-9])([A-Z])")
 )
 
+const refPrefix = "#/definitions/"
+
 // OpenAPISpec represents the OpenAPI specification structure
 type OpenAPISpec struct {
-	Swagger string                          `json:"swagger"`
-	Info    OpenAPIInfo                     `json:"info"`
-	Host    string                          `json:"host"`
-	Schemes []string                        `json:"schemes"`
-	Paths   map[string]map[string]Operation `json:"paths"`
+	Swagger     string                          `json:"swagger"`
+	Info        OpenAPIInfo                     `json:"info"`
+	Host        string                          `json:"host"`
+	Schemes     []string                        `json:"schemes"`
+	Paths       map[string]map[string]Operation `json:"paths"`
+	Definitions map[string]Definition           `json:"definitions"`
 }
 
 type OpenAPIInfo struct {
@@ -55,8 +58,14 @@ type Parameter struct {
 
 type ParamSchema struct {
 	Type        string   `json:"type"`
-	Enum        []string `json:"enum"`
-	Description string   `json:"description"`
+	Enum        []string `json:"enum,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Ref         string   `json:"$ref,omitempty"`
+}
+
+type Definition struct {
+	Type       string                 `json:"type"`
+	Properties map[string]ParamSchema `json:"properties"`
 }
 
 type httpClient interface {
@@ -145,7 +154,7 @@ func (s *Server) generateTools() error {
 				continue
 			}
 
-			tool, handler := s.createToolFromOperation(path, method, operation)
+			tool, handler := s.createToolFromOperation(path, method, operation, s.spec.Definitions)
 			if tool.Name != "" {
 				tools = append(tools, tool)
 				handlers = append(handlers, handler)
@@ -170,7 +179,7 @@ func (s *Server) hasAllowedTag(tags []string) bool {
 }
 
 // createToolFromOperation creates an MCP tool from an OpenAPI operation
-func (s *Server) createToolFromOperation(path, method string, operation Operation) (mcp.Tool, server.ToolHandlerFunc) {
+func (s *Server) createToolFromOperation(path, method string, operation Operation, definitions map[string]Definition) (mcp.Tool, server.ToolHandlerFunc) {
 	toolName := s.generateToolName(path, method, operation)
 	description := getDescription(path, method, operation)
 
@@ -178,13 +187,11 @@ func (s *Server) createToolFromOperation(path, method string, operation Operatio
 
 	// Add configuration examples information to pipeline tool descriptions
 	if isPipelineTool(toolName, operation) {
-		toolOptions = append(toolOptions, mcp.WithString("example_node_specifications",
-			mcp.Description("Example node specifications for the pipeline to how to add a node to the pipeline. Visit first to get example node specifications. You can get the example node specifications from https://release.edgedelta.com/release/all-features-v3.yml"),
-		))
+		toolOptions = append(toolOptions, withMoreDescription("Example node specifications for the pipeline to how to add a node to the pipeline. Visit first to get example node specifications. You can get the example node specifications from https://release.edgedelta.com/release/all-features-v3.yml"))
 	}
 
 	for _, param := range operation.Parameters {
-		s.addParameterToTool(&toolOptions, param)
+		s.addParameterToTool(&toolOptions, param, definitions)
 	}
 	tool := mcp.NewTool(toolName, toolOptions...)
 
@@ -244,23 +251,15 @@ func (s *Server) toSnakeCase(str string) string {
 }
 
 // addParameterToTool adds a parameter to the tool options
-func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter) {
+func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter, definitions map[string]Definition) {
 	// Skip org_id parameter since it's auto-injected from context
 	if strings.EqualFold(param.Name, "org_id") {
 		return
 	}
 
-	paramName := param.Name
-	paramDesc := param.Description
-	if paramDesc == "" {
-		paramDesc = fmt.Sprintf("Parameter: %s", paramName)
-	}
-
 	// Handle body parameters
 	if param.In == "body" {
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-			mcp.Description(paramDesc+" (JSON payload)"),
-		))
+		*toolOptions = append(*toolOptions, mcp.WithString(param.Name, withBodyParam(param, definitions)))
 		return
 	}
 
@@ -273,14 +272,14 @@ func (s *Server) addParameterToTool(toolOptions *[]mcp.ToolOption, param Paramet
 	// Add parameter based on type
 	switch paramType {
 	case "string":
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName, withParam(param)))
+		*toolOptions = append(*toolOptions, mcp.WithString(param.Name, withParam(param)))
 	case "integer", "number":
-		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName, withParam(param)))
+		*toolOptions = append(*toolOptions, mcp.WithNumber(param.Name, withParam(param)))
 	case "boolean":
-		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName, withParam(param)))
+		*toolOptions = append(*toolOptions, mcp.WithBoolean(param.Name, withParam(param)))
 	default:
 		// Default to string for unknown types
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName, withParam(param)))
+		*toolOptions = append(*toolOptions, mcp.WithString(param.Name, withParam(param)))
 	}
 }
 
@@ -469,12 +468,12 @@ func optionalParam[T any](r mcp.CallToolRequest, p string) (T, error) {
 	return r.GetArguments()[p].(T), nil
 }
 
-// populates schema based on the parameter definition
+// withParam populates schema based on the parameter definition
 func withParam(param Parameter) mcp.PropertyOption {
+	if param.Description != "" {
+		param.Description = fmt.Sprintf("Parameter: %s", param.Name)
+	}
 	return func(schema map[string]any) {
-		if param.Description != "" {
-			param.Description = fmt.Sprintf("Parameter: %s", param.Name)
-		}
 		schema["description"] = param.Description
 		if param.Required {
 			schema["required"] = true
@@ -482,5 +481,35 @@ func withParam(param Parameter) mcp.PropertyOption {
 		if param.Schema != nil && len(param.Schema.Enum) > 0 {
 			schema["enum"] = param.Schema.Enum
 		}
+	}
+}
+
+// withBodyParam includes additional information about the body parameter in the description
+func withBodyParam(param Parameter, definitions map[string]Definition) mcp.PropertyOption {
+	if param.Description != "" {
+		param.Description = "Parameter: " + param.Name
+	}
+	return func(schema map[string]any) {
+		schema["description"] = param.Description + " (JSON Payload)"
+		if param.Schema == nil || param.Schema.Ref == "" {
+			return
+		}
+		ref := strings.TrimPrefix(param.Schema.Ref, refPrefix)
+		definition, ok := definitions[ref]
+		if !ok {
+			return
+		}
+		json, err := json.Marshal(definition.Properties)
+		if err != nil {
+			return
+		}
+		schema["description"] = param.Description + ". It is JSON Payload with following fields: " + string(json)
+	}
+}
+
+// withMoreDescription appends additional description instead of replacing the existing one
+func withMoreDescription(desc string) mcp.ToolOption {
+	return func(t *mcp.Tool) {
+		t.Description = t.Description + " " + desc
 	}
 }
