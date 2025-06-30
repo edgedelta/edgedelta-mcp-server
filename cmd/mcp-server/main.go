@@ -50,7 +50,7 @@ var (
 	}
 
 	allowedTags   = []string{"AI"}
-	swaggerDocURL = "https://api2.edgedelta.com/swagger_internal/doc.json"
+	swaggerDocURL = "https://api2.edgedelta.com/swagger/doc.json"
 )
 
 func initLogger(outPath string) (*slog.Logger, error) {
