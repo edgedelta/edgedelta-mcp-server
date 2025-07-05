@@ -133,7 +133,9 @@ func getToolName(operation Operation) (string, error) {
 	if operation.OperationID != "" {
 		return operation.OperationID, nil
 	} else if operation.Tags[0] != "" { // TODO: This is a fallback we'll get rid of once we ensure all operations have an ID.
-		return operation.Tags[0], nil
+		lower := strings.ToLower(operation.Tags[0])
+		strings.ReplaceAll(lower, " ", "_")
+		return lower, nil
 	}
 	return "", fmt.Errorf("no operation id found for operation")
 }
