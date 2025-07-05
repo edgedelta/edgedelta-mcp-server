@@ -80,6 +80,7 @@ func main() {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
 
+	log.Printf("Starting MCP server on :%d", mcpServerPort)
 	httpServer := server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(tokenMiddleware))
 	if err := httpServer.Start(fmt.Sprintf(":%d", mcpServerPort)); err != nil {
 		log.Fatal(err)

@@ -132,6 +132,8 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 func getToolName(operation Operation) (string, error) {
 	if operation.OperationID != "" {
 		return operation.OperationID, nil
+	} else if operation.Tags[0] != "" { // TODO: This is a fallback we'll get rid of once we ensure all operations have an ID.
+		return operation.Tags[0], nil
 	}
 	return "", fmt.Errorf("no operation id found for operation")
 }
