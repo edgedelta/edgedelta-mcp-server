@@ -50,17 +50,13 @@ type ParamSchema struct {
 	Description string   `json:"description"`
 }
 
-var (
-	httpClient *http.Client
-)
-
 // ToolToHandler encapsulates a tool and its handler
 type ToolToHandler struct {
 	Tool    mcp.Tool
 	Handler server.ToolHandlerFunc
 }
 
-func fetchOpenAPISpec(url string) (*OpenAPISpec, error) {
+func fetchOpenAPISpec(httpClient *http.Client, url string) (*OpenAPISpec, error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
@@ -105,11 +101,11 @@ func genToolAndHandlers(apiURL string, httpClient *http.Client, openAPISpec *Ope
 }
 
 func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation Operation) (ToolToHandler, error) {
-	// We get operationId as tool name
-	if operation.OperationID == "" {
-		return ToolToHandler{}, fmt.Errorf("no operationId found for operation")
+	toolName, err := getToolName(operation)
+	if err != nil {
+		return ToolToHandler{}, err
 	}
-	toolName := operation.OperationID
+
 	// I believe we shouldn't use path and method to generate description
 	description, err := getDescription(operation)
 	if err != nil {
@@ -131,6 +127,13 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 		Tool:    tool,
 		Handler: handler,
 	}, err
+}
+
+func getToolName(operation Operation) (string, error) {
+	if operation.OperationID != "" {
+		return operation.OperationID, nil
+	}
+	return "", fmt.Errorf("no operation id found for operation")
 }
 
 func getDescription(operation Operation) (string, error) {
@@ -367,7 +370,7 @@ func NewToolsFromSpec(apiURL string, openAPISpec *OpenAPISpec, httpClient *http.
 }
 
 func NewToolsFromURL(url, apiURL string, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
-	spec, err := fetchOpenAPISpec(url)
+	spec, err := fetchOpenAPISpec(httpClient, url)
 	if err != nil {
 		return nil, err
 	}
