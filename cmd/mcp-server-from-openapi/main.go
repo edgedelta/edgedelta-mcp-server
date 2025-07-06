@@ -43,15 +43,15 @@ func TokenKeyFromContext(ctx context.Context) (string, bool) {
 	return token, true
 }
 
-func SetTokenInContext(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, apiTokenKey, token)
+func SetTokenInContext(ctx context.Context, apiToken string) context.Context {
+	return context.WithValue(ctx, apiTokenKey, apiToken)
 }
 
 // authMiddleware extracts the API token from the request header and adds it to the context
 func authMiddleware(ctx context.Context, r *http.Request) context.Context {
-	token := r.Header.Get(edAPITokenHeader)
-	if token != "" {
-		return SetTokenInContext(ctx, token)
+	apiToken := r.Header.Get(edAPITokenHeader)
+	if apiToken != "" {
+		return SetTokenInContext(ctx, apiToken)
 	}
 	return ctx
 }
