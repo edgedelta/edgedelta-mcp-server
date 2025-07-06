@@ -93,7 +93,7 @@ func main() {
 	}
 
 	log.Printf("Starting MCP server on :%d", mcpServerPort)
-	httpServer := server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(authMiddleware))
+	httpServer := server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(authMiddleware), server.WithStateLess(true))
 	if err := httpServer.Start(fmt.Sprintf(":%d", mcpServerPort)); err != nil {
 		log.Fatal(err)
 	}
