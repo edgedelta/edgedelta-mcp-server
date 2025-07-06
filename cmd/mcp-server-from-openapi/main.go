@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/openapi2mcp"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/openapi2mcp"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -72,19 +69,19 @@ func main() {
 	}
 	allowedTags := []string{"AI"}
 
-	//toolToHandlers, err := openapi2mcp.NewToolsFromURL(openAPIDocURL, edgeDeltaAPIURL, httpClient, openapi2mcp.WithAllowedTags(allowedTags))
+	toolToHandlers, err := openapi2mcp.NewToolsFromURL(openAPIDocURL, edgeDeltaAPIURL, httpClient, openapi2mcp.WithAllowedTags(allowedTags))
 
-	specBytes, err := os.ReadFile("swagger.json")
-	if err != nil {
-		log.Fatalf("failed to read swagger.json: %v", err)
-	}
-
-	var spec openapi2mcp.OpenAPISpec
-	if err := json.Unmarshal(specBytes, &spec); err != nil {
-		log.Fatalf("failed to unmarshal swagger.json: %v", err)
-	}
-
-	toolToHandlers, err := openapi2mcp.NewToolsFromSpec(edgeDeltaAPIURL, &spec, httpClient, openapi2mcp.WithAllowedTags(allowedTags))
+	//specBytes, err := os.ReadFile("swagger.json")
+	//if err != nil {
+	//	log.Fatalf("failed to read swagger.json: %v", err)
+	//}
+	//
+	//var spec openapi2mcp.OpenAPISpec
+	//if err := json.Unmarshal(specBytes, &spec); err != nil {
+	//	log.Fatalf("failed to unmarshal swagger.json: %v", err)
+	//}
+	//
+	//toolToHandlers, err := openapi2mcp.NewToolsFromSpec(edgeDeltaAPIURL, &spec, httpClient, openapi2mcp.WithAllowedTags(allowedTags))
 	if err != nil {
 		log.Fatal(err)
 	}
