@@ -26,14 +26,14 @@ type authedTransport struct {
 	roundTripper http.RoundTripper
 }
 
-type TokenKey string
+type APITokenKey string
 
 var (
-	tokenKey TokenKey = "token"
+	apiTokenKey APITokenKey = "apiToken"
 )
 
 func TokenKeyFromContext(ctx context.Context) (string, bool) {
-	value := ctx.Value(tokenKey)
+	value := ctx.Value(apiTokenKey)
 	if value == nil {
 		return "", false
 	}
@@ -47,11 +47,11 @@ func TokenKeyFromContext(ctx context.Context) (string, bool) {
 }
 
 func SetTokenInContext(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, tokenKey, token)
+	return context.WithValue(ctx, apiTokenKey, token)
 }
 
-// tokenMiddleware extracts the token from the request header and adds it to the context
-func tokenMiddleware(ctx context.Context, r *http.Request) context.Context {
+// authMiddleware extracts the API token from the request header and adds it to the context
+func authMiddleware(ctx context.Context, r *http.Request) context.Context {
 	token := r.Header.Get(edAPITokenHeader)
 	if token != "" {
 		return SetTokenInContext(ctx, token)
@@ -96,7 +96,7 @@ func main() {
 	}
 
 	log.Printf("Starting MCP server on :%d", mcpServerPort)
-	httpServer := server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(tokenMiddleware))
+	httpServer := server.NewStreamableHTTPServer(s, server.WithHTTPContextFunc(authMiddleware))
 	if err := httpServer.Start(fmt.Sprintf(":%d", mcpServerPort)); err != nil {
 		log.Fatal(err)
 	}
