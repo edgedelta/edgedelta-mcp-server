@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -198,4 +199,65 @@ func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token s
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-ED-API-Token", token)
 	return req, nil
+}
+
+func (c *HTTPClient) SavePipeline(ctx context.Context, confID, description, pipeline, content string) (map[string]interface{}, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	saveURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/save", apiURL, orgID, confID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare request payload
+	payload := map[string]any{
+		"description": description,
+	}
+
+	if pipeline != "" {
+		// Parse pipeline JSON string
+		var pipelineObj map[string]any
+		if err := json.Unmarshal([]byte(pipeline), &pipelineObj); err != nil {
+			return nil, fmt.Errorf("failed to parse pipeline JSON, err: %v", err)
+		}
+		payload["pipeline"] = pipelineObj
+	}
+
+	if content != "" {
+		payload["content"] = content
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, saveURL.String(), strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create save pipeline request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-ED-API-Token", token)
+
+	resp, err := c.cl.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to save pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode save pipeline response: %v", err)
+	}
+
+	return result, nil
 }
