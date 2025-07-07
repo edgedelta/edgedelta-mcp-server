@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/openapi2mcp"
 	"log"
 	"net/http"
+
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/openapi2mcp"
 
 	"github.com/mark3labs/mcp-go/server"
 )
