@@ -79,7 +79,7 @@ func fetchOpenAPISpec(httpClient *http.Client, url string) (*OpenAPISpec, error)
 	return spec, nil
 }
 
-func genToolAndHandlers(apiURL string, httpClient *http.Client, openAPISpec *OpenAPISpec, allowedTags []string) ([]ToolToHandler, error) {
+func createToolToHandlers(apiURL string, httpClient *http.Client, openAPISpec *OpenAPISpec, allowedTags []string) ([]ToolToHandler, error) {
 	var toolToHandlerSlice []ToolToHandler
 
 	for path, methods := range openAPISpec.Paths {
@@ -370,7 +370,7 @@ func NewToolsFromSpec(apiURL string, openAPISpec *OpenAPISpec, httpClient *http.
 		opt(&options)
 	}
 
-	return genToolAndHandlers(apiURL, httpClient, openAPISpec, options.AllowedTags)
+	return createToolToHandlers(apiURL, httpClient, openAPISpec, options.AllowedTags)
 }
 
 func NewToolsFromURL(url, apiURL string, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
