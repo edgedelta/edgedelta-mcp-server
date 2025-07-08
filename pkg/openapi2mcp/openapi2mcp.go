@@ -72,7 +72,7 @@ func fetchOpenAPISpec(httpClient *http.Client, url string) (*OpenAPISpec, error)
 		return nil, fmt.Errorf("failed to read response body, err: %w", err)
 	}
 
-	spec := new(OpenAPISpec)
+	spec := &OpenAPISpec{}
 	if err := json.Unmarshal(data, spec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response body, err: %w", err)
 	}
