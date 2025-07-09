@@ -27,12 +27,12 @@ func SavePipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			confID, err := requiredParam[string](request, "conf_id")
+			confID, err := request.RequireString("conf_id")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get conf_id: %w", err)
 			}
 
-			description, err := requiredParam[string](request, "description")
+			description, err := request.RequireString("description")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get description: %w", err)
 			}
@@ -67,19 +67,4 @@ func SavePipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 
 			return mcp.NewToolResultText(string(r)), nil
 		}
-}
-
-// requiredParam is a helper function to get required parameters
-func requiredParam[T any](r mcp.CallToolRequest, p string) (T, error) {
-	var zero T
-
-	if _, ok := r.GetArguments()[p]; !ok {
-		return zero, fmt.Errorf("parameter %s is required", p)
-	}
-
-	if _, ok := r.GetArguments()[p].(T); !ok {
-		return zero, fmt.Errorf("parameter %s is not of type %T, is %T", p, zero, r.GetArguments()[p])
-	}
-
-	return r.GetArguments()[p].(T), nil
 }
