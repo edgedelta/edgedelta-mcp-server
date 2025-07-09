@@ -217,17 +217,15 @@ func (c *HTTPClient) SavePipeline(ctx context.Context, confID, description, pipe
 		"description": description,
 	}
 
-	if pipeline != "" {
+	if content != "" {
+		payload["content"] = content
+	} else if pipeline != "" {
 		// Parse pipeline JSON string
 		var pipelineObj map[string]any
 		if err := json.Unmarshal([]byte(pipeline), &pipelineObj); err != nil {
 			return nil, fmt.Errorf("failed to parse pipeline JSON, err: %v", err)
 		}
 		payload["pipeline"] = pipelineObj
-	}
-
-	if content != "" {
-		payload["content"] = content
 	}
 
 	payloadBytes, err := json.Marshal(payload)
