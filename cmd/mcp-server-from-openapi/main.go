@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/openapi2mcp"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -70,7 +70,7 @@ func main() {
 	}
 	allowedTags := []string{"AI"}
 
-	toolToHandlers, err := openapi2mcp.NewToolsFromURL(openAPIDocURL, edgeDeltaAPIURL, httpClient, openapi2mcp.WithAllowedTags(allowedTags))
+	toolToHandlers, err := swagger2mcp.NewToolsFromURL(openAPIDocURL, edgeDeltaAPIURL, httpClient, swagger2mcp.WithAllowedTags(allowedTags))
 
 	if err != nil {
 		log.Fatal(err)

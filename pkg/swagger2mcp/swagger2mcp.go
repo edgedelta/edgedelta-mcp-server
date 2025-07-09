@@ -1,54 +1,18 @@
-package openapi2mcp
+package swagger2mcp
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
+	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
-
-type OpenAPISpec struct {
-	Swagger string                          `json:"swagger"`
-	Info    OpenAPIInfo                     `json:"info"`
-	Host    string                          `json:"host"`
-	Schemes []string                        `json:"schemes"`
-	Paths   map[string]map[string]Operation `json:"paths"`
-}
-
-type OpenAPIInfo struct {
-	Title       string `json:"title"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-}
-
-type Operation struct {
-	OperationID string                `json:"operationId"`
-	Summary     string                `json:"summary"`
-	Description string                `json:"description"`
-	Tags        []string              `json:"tags"`
-	Parameters  []Parameter           `json:"parameters"`
-	Security    []map[string][]string `json:"security"`
-}
-
-type Parameter struct {
-	Name        string       `json:"name"`
-	In          string       `json:"in"`
-	Type        string       `json:"type"`
-	Required    bool         `json:"required"`
-	Description string       `json:"description"`
-	Schema      *ParamSchema `json:"schema,omitempty"`
-}
-
-type ParamSchema struct {
-	Type        string   `json:"type"`
-	Enum        []string `json:"enum"`
-	Description string   `json:"description"`
-}
 
 // ToolToHandler encapsulates a tool and its handler
 type ToolToHandler struct {
@@ -56,7 +20,7 @@ type ToolToHandler struct {
 	Handler server.ToolHandlerFunc
 }
 
-func fetchOpenAPISpec(httpClient *http.Client, url string) (*OpenAPISpec, error) {
+func fetchOpenAPISpec(httpClient *http.Client, url string) (*spec.Swagger, error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
@@ -72,23 +36,40 @@ func fetchOpenAPISpec(httpClient *http.Client, url string) (*OpenAPISpec, error)
 		return nil, fmt.Errorf("failed to read response body, err: %w", err)
 	}
 
-	spec := &OpenAPISpec{}
-	if err := json.Unmarshal(data, spec); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response body, err: %w", err)
+	swaggerSpec := &spec.Swagger{}
+	if err := json.Unmarshal(data, swaggerSpec); err != nil {
+		log.Fatalf("Failed to parse swagger.json: %v", err)
 	}
-	return spec, nil
+
+	err = spec.ExpandSpec(swaggerSpec, &spec.ExpandOptions{
+		RelativeBase: "",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand spec: %w", err)
+	}
+
+	return swaggerSpec, nil
 }
 
-func createToolToHandlers(apiURL string, httpClient *http.Client, openAPISpec *OpenAPISpec, allowedTags []string) ([]ToolToHandler, error) {
+func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
 	var toolToHandlerSlice []ToolToHandler
 
-	for path, methods := range openAPISpec.Paths {
-		for method, operation := range methods {
-			// Skip if no allowed tags match
+	for path, pathItem := range swaggerSpec.Paths.Paths {
+		operations := map[string]*spec.Operation{
+			"GET":    pathItem.Get,
+			"POST":   pathItem.Post,
+			"PUT":    pathItem.Put,
+			"DELETE": pathItem.Delete,
+			"PATCH":  pathItem.Patch,
+		}
+
+		for method, operation := range operations {
+			if operation == nil {
+				continue
+			}
 			if !hasAllowedTag(operation.Tags, allowedTags) {
 				continue
 			}
-
 			toolToHandler, err := createToolToHandler(httpClient, apiURL, path, method, operation)
 			if err != nil {
 				return nil, err
@@ -100,7 +81,7 @@ func createToolToHandlers(apiURL string, httpClient *http.Client, openAPISpec *O
 	return toolToHandlerSlice, nil
 }
 
-func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation Operation) (ToolToHandler, error) {
+func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation *spec.Operation) (ToolToHandler, error) {
 	toolName, err := getToolName(operation)
 	if err != nil {
 		return ToolToHandler{}, err
@@ -112,13 +93,11 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 		return ToolToHandler{}, err
 	}
 
-	toolOptions := []mcp.ToolOption{mcp.WithDescription(description)}
-
-	for _, param := range operation.Parameters {
-		toolParam := addParameterToTool(param)
-		toolOptions = append(toolOptions, toolParam)
+	inputSchema, err := inputSchemaFromOperation(operation)
+	if err != nil {
+		return ToolToHandler{}, err
 	}
-	tool := mcp.NewTool(toolName, toolOptions...)
+	tool := mcp.NewToolWithRawSchema(toolName, description, inputSchema)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return makeOpenAPICall(ctx, httpClient, request, apiURL, path, method, operation)
@@ -130,9 +109,9 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 	}, err
 }
 
-func getToolName(operation Operation) (string, error) {
-	if operation.OperationID != "" {
-		return operation.OperationID, nil
+func getToolName(operation *spec.Operation) (string, error) {
+	if operation.ID != "" {
+		return operation.ID, nil
 	} else if operation.Tags[0] != "" { // TODO: This is a fallback we'll get rid of once we ensure all operations have an ID.
 		lower := strings.ToLower(operation.Tags[0])
 		snakeCase := strings.ReplaceAll(lower, " ", "_")
@@ -141,7 +120,7 @@ func getToolName(operation Operation) (string, error) {
 	return "", fmt.Errorf("no operation id found for operation")
 }
 
-func getDescription(operation Operation) (string, error) {
+func getDescription(operation *spec.Operation) (string, error) {
 	if operation.Description != "" {
 		return operation.Description, nil
 	} else if operation.Summary != "" {
@@ -165,55 +144,35 @@ func hasAllowedTag(tags []string, allowedTags []string) bool {
 	return false
 }
 
-func addParameterToTool(param Parameter) mcp.ToolOption {
-	paramName := param.Name
-	paramDesc := param.Description
-	if paramDesc == "" {
-		paramDesc = fmt.Sprintf("Parameter: %s", paramName)
+func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
 	}
+	properties := schema["properties"].(map[string]any)
+	var required []string
 
-	// Handle body parameters
-	if param.In == "body" {
-		return mcp.WithString(paramName,
-			mcp.Description(paramDesc+" (JSON payload)"),
-		)
-	} else {
-		// Except body, all parameters are guaranteed to be primitive types. I.e., string, int, boolean, etc.
-		// So, we don't need to resolve the type recursively.
-
-		paramType := param.Type
-		if paramType == "" && param.Schema != nil {
-			paramType = param.Schema.Type
-		}
-
-		// Add parameter based on type
-		switch paramType {
-		case "string":
-			if param.Schema != nil && len(param.Schema.Enum) > 0 {
-				return mcp.WithString(paramName,
-					mcp.Description(paramDesc),
-					mcp.Enum(param.Schema.Enum...),
-				)
-			} else {
-				return mcp.WithString(paramName,
-					mcp.Description(paramDesc),
-				)
+	for _, param := range operation.Parameters {
+		if param.In == "body" {
+			// TODO: We need to add description, too.
+			properties[param.Name] = param.Schema.SchemaProps
+		} else {
+			properties[param.Name] = map[string]any{
+				"type":        param.Type,
+				"description": param.Description,
 			}
-		case "integer", "number":
-			return mcp.WithNumber(paramName,
-				mcp.Description(paramDesc),
-			)
-		case "boolean":
-			return mcp.WithBoolean(paramName,
-				mcp.Description(paramDesc),
-			)
-		default:
-			// Default to string for unknown types
-			return mcp.WithString(paramName,
-				mcp.Description(paramDesc),
-			)
+		}
+		if param.Required {
+			required = append(required, param.Name)
 		}
 	}
+
+	schemaJSON, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal schema: %w", err)
+	}
+
+	return schemaJSON, nil
 }
 
 func makeOpenAPICall(
@@ -221,7 +180,7 @@ func makeOpenAPICall(
 	httpClient *http.Client,
 	request mcp.CallToolRequest,
 	apiURL, path, method string,
-	operation Operation,
+	operation *spec.Operation,
 ) (*mcp.CallToolResult, error) {
 	args, ok := request.Params.Arguments.(map[string]any)
 	if !ok {
@@ -232,7 +191,7 @@ func makeOpenAPICall(
 
 	// Check for body parameters and prepare request body
 	var requestBody io.Reader
-	var bodyParam *Parameter
+	var bodyParam *spec.Parameter
 	for _, param := range operation.Parameters {
 		if param.In == "body" {
 			bodyParam = &param
@@ -284,7 +243,7 @@ func makeOpenAPICall(
 	return mcp.NewToolResultText(string(respBody)), nil
 }
 
-func addQueryParameters(req *http.Request, parameters []Parameter, request mcp.CallToolRequest) {
+func addQueryParameters(req *http.Request, parameters []spec.Parameter, request mcp.CallToolRequest) {
 	query := req.URL.Query()
 
 	for _, param := range parameters {
@@ -295,9 +254,6 @@ func addQueryParameters(req *http.Request, parameters []Parameter, request mcp.C
 
 		// Get parameter type from param.Type or param.Schema.Type
 		paramType := param.Type
-		if paramType == "" && param.Schema != nil {
-			paramType = param.Schema.Type
-		}
 
 		// Use type-safe parameter extraction based on OpenAPI spec
 		switch paramType {
@@ -366,13 +322,13 @@ func WithAllowedTags(allowedTags []string) NewToolsFromSpecOption {
 	}
 }
 
-func NewToolsFromSpec(apiURL string, openAPISpec *OpenAPISpec, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
+func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
 	var options ToolsFromSpecOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	return createToolToHandlers(apiURL, httpClient, openAPISpec, options.AllowedTags)
+	return createToolToHandlers(apiURL, httpClient, swaggerSpec, options.AllowedTags)
 }
 
 func NewToolsFromURL(url, apiURL string, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
