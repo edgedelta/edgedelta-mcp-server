@@ -109,7 +109,12 @@ func runStdioServer(cfg runConfig) error {
 	// Create auto-sync OpenAPI server with AI tag filtering
 	cfg.logger.Info("Starting EdgeDelta MCP Server with derived from swagger doc", "url", swaggerDocURL)
 
-	edServer, err := tools.CreateServer(version, swaggerDocURL, apiURL, allowedTags)
+	spec, err := tools.FetchSpec(swaggerDocURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch spec: %w", err)
+	}
+
+	edServer, err := tools.CreateServer(version, spec, apiURL, allowedTags)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

@@ -77,18 +77,17 @@ type httpClient interface {
 
 // Server manages auto-syncing OpenAPI-based MCP tools
 type Server struct {
-	httpClient    httpClient
-	client        Client
-	swaggerDocURL string
-	apiURL        string
-	allowedTags   map[string]struct{}
-	spec          *OpenAPISpec
-	tools         []mcp.Tool
-	handlers      []server.ToolHandlerFunc
+	httpClient  httpClient
+	client      Client
+	apiURL      string
+	allowedTags map[string]struct{}
+	spec        *OpenAPISpec
+	tools       []mcp.Tool
+	handlers    []server.ToolHandlerFunc
 }
 
-// newServer creates a new auto-syncing OpenAPI server
-func newServer(swaggerDocURL, apiURL string, allowedTags []string) *Server {
+// newServer creates a new auto-syncing OpenAPI server from a parsed spec
+func newServer(spec *OpenAPISpec, apiURL string, allowedTags []string) *Server {
 	tagMap := make(map[string]struct{})
 	for _, tag := range allowedTags {
 		tagMap[tag] = struct{}{}
@@ -96,48 +95,12 @@ func newServer(swaggerDocURL, apiURL string, allowedTags []string) *Server {
 
 	httpClient := NewHTTPlient()
 	return &Server{
-		swaggerDocURL: swaggerDocURL,
-		allowedTags:   tagMap,
-		apiURL:        apiURL,
-		httpClient:    httpClient,
-		client:        httpClient,
+		allowedTags: tagMap,
+		spec:        spec,
+		apiURL:      apiURL,
+		httpClient:  httpClient,
+		client:      httpClient,
 	}
-}
-
-// LoadSpec loads the OpenAPI specification from local file or URL
-func (s *Server) LoadSpec() error {
-	data, err := s.retrieveOpenAPISpec(s.swaggerDocURL)
-	if err != nil {
-		return fmt.Errorf("failed to fetch swagger from URL, err: %w", err)
-	}
-
-	var spec OpenAPISpec
-	if err := json.Unmarshal(data, &spec); err != nil {
-		return fmt.Errorf("failed to parse swagger JSON, err: %w", err)
-	}
-	s.spec = &spec
-
-	return s.generateTools()
-}
-
-// retrieveOpenAPISpec fetches the OpenAPI specification from a URL
-func (s *Server) retrieveOpenAPISpec(url string) ([]byte, error) {
-	resp, err := s.httpClient.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response status code: %d when fetching URL", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body, err: %w", err)
-	}
-
-	return data, nil
 }
 
 // generateTools creates MCP tools from the OpenAPI specification
@@ -397,12 +360,37 @@ func (s *Server) addQueryParameters(req *http.Request, parameters []Parameter, r
 	req.URL.RawQuery = query.Encode()
 }
 
-// CreateServer creates an MCP server with auto-syncing OpenAPI tools
-func CreateServer(version, swaggerDocURL, apiURL string, allowedTags []string) (*server.MCPServer, error) {
-	srv := newServer(swaggerDocURL, apiURL, allowedTags)
+// FetchSpec fetches and parses the OpenAPI spec from a URL
+func FetchSpec(url string) (*OpenAPISpec, error) {
+	httpClient := NewHTTPlient()
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
+	}
+	defer resp.Body.Close()
 
-	if err := srv.LoadSpec(); err != nil {
-		return nil, fmt.Errorf("failed to load initial spec: %w", err)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected response status code: %d when fetching URL", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body, err: %w", err)
+	}
+
+	var spec OpenAPISpec
+	if err := json.Unmarshal(data, &spec); err != nil {
+		return nil, fmt.Errorf("failed to parse swagger JSON, err: %w", err)
+	}
+	return &spec, nil
+}
+
+// CreateServer creates an MCP server with auto-syncing OpenAPI tools from a parsed spec
+func CreateServer(version string, spec *OpenAPISpec, apiURL string, allowedTags []string) (*server.MCPServer, error) {
+	srv := newServer(spec, apiURL, allowedTags)
+
+	if err := srv.generateTools(); err != nil {
+		return nil, fmt.Errorf("failed to generate tools: %w", err)
 	}
 
 	// Create MCP server
