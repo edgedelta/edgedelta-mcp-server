@@ -154,8 +154,16 @@ func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
 
 	for _, param := range operation.Parameters {
 		if param.In == "body" {
-			// TODO: We need to add description, too.
-			properties[param.Name] = param.Schema.SchemaProps
+			// Use anonymous struct to combine schema props with description
+			bodySchema := struct {
+				spec.SchemaProps
+				Description string `json:"description,omitempty"`
+			}{
+				SchemaProps: param.Schema.SchemaProps,
+				Description: param.Description,
+			}
+
+			properties[param.Name] = bodySchema
 		} else {
 			properties[param.Name] = map[string]any{
 				"type":        param.Type,
