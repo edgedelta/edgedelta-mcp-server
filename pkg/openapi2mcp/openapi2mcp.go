@@ -115,7 +115,8 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 	toolOptions := []mcp.ToolOption{mcp.WithDescription(description)}
 
 	for _, param := range operation.Parameters {
-		addParameterToTool(&toolOptions, param)
+		toolParam := addParameterToTool(param)
+		toolOptions = append(toolOptions, toolParam)
 	}
 	tool := mcp.NewTool(toolName, toolOptions...)
 
@@ -164,7 +165,7 @@ func hasAllowedTag(tags []string, allowedTags []string) bool {
 	return false
 }
 
-func addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter) {
+func addParameterToTool(param Parameter) mcp.ToolOption {
 	paramName := param.Name
 	paramDesc := param.Description
 	if paramDesc == "" {
@@ -173,10 +174,9 @@ func addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter) {
 
 	// Handle body parameters
 	if param.In == "body" {
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+		return mcp.WithString(paramName,
 			mcp.Description(paramDesc+" (JSON payload)"),
-		))
-		return
+		)
 	} else {
 		// Except body, all parameters are guaranteed to be primitive types. I.e., string, int, boolean, etc.
 		// So, we don't need to resolve the type recursively.
@@ -190,28 +190,28 @@ func addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter) {
 		switch paramType {
 		case "string":
 			if param.Schema != nil && len(param.Schema.Enum) > 0 {
-				*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+				return mcp.WithString(paramName,
 					mcp.Description(paramDesc),
 					mcp.Enum(param.Schema.Enum...),
-				))
+				)
 			} else {
-				*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+				return mcp.WithString(paramName,
 					mcp.Description(paramDesc),
-				))
+				)
 			}
 		case "integer", "number":
-			*toolOptions = append(*toolOptions, mcp.WithNumber(paramName,
+			return mcp.WithNumber(paramName,
 				mcp.Description(paramDesc),
-			))
+			)
 		case "boolean":
-			*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName,
+			return mcp.WithBoolean(paramName,
 				mcp.Description(paramDesc),
-			))
+			)
 		default:
 			// Default to string for unknown types
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+			return mcp.WithString(paramName,
 				mcp.Description(paramDesc),
-			))
+			)
 		}
 	}
 }
