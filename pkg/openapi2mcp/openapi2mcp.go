@@ -177,40 +177,42 @@ func addParameterToTool(toolOptions *[]mcp.ToolOption, param Parameter) {
 			mcp.Description(paramDesc+" (JSON payload)"),
 		))
 		return
-	}
+	} else {
+		// Except body, all parameters are guaranteed to be primitive types. I.e., string, int, boolean, etc.
+		// So, we don't need to resolve the type recursively.
 
-	// Get parameter type
-	paramType := param.Type
-	if paramType == "" && param.Schema != nil {
-		paramType = param.Schema.Type
-	}
+		paramType := param.Type
+		if paramType == "" && param.Schema != nil {
+			paramType = param.Schema.Type
+		}
 
-	// Add parameter based on type
-	switch paramType {
-	case "string":
-		if param.Schema != nil && len(param.Schema.Enum) > 0 {
-			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+		// Add parameter based on type
+		switch paramType {
+		case "string":
+			if param.Schema != nil && len(param.Schema.Enum) > 0 {
+				*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+					mcp.Description(paramDesc),
+					mcp.Enum(param.Schema.Enum...),
+				))
+			} else {
+				*toolOptions = append(*toolOptions, mcp.WithString(paramName,
+					mcp.Description(paramDesc),
+				))
+			}
+		case "integer", "number":
+			*toolOptions = append(*toolOptions, mcp.WithNumber(paramName,
 				mcp.Description(paramDesc),
-				mcp.Enum(param.Schema.Enum...),
 			))
-		} else {
+		case "boolean":
+			*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName,
+				mcp.Description(paramDesc),
+			))
+		default:
+			// Default to string for unknown types
 			*toolOptions = append(*toolOptions, mcp.WithString(paramName,
 				mcp.Description(paramDesc),
 			))
 		}
-	case "integer", "number":
-		*toolOptions = append(*toolOptions, mcp.WithNumber(paramName,
-			mcp.Description(paramDesc),
-		))
-	case "boolean":
-		*toolOptions = append(*toolOptions, mcp.WithBoolean(paramName,
-			mcp.Description(paramDesc),
-		))
-	default:
-		// Default to string for unknown types
-		*toolOptions = append(*toolOptions, mcp.WithString(paramName,
-			mcp.Description(paramDesc),
-		))
 	}
 }
 
