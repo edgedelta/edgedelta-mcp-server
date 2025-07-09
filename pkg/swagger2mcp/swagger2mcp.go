@@ -175,6 +175,10 @@ func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
 		}
 	}
 
+	if len(required) > 0 {
+		schema["required"] = required
+	}
+
 	schemaJSON, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal schema: %w", err)
