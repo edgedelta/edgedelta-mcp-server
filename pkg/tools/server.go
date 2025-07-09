@@ -413,9 +413,7 @@ func CreateServer(version, swaggerDocURL, apiURL string, allowedTags []string) (
 		s.AddTool(tool, srv.handlers[i])
 	}
 
-	// Add manual tools
-	s.AddTool(GetPipelinesTool(srv.client))
-	s.AddTool(SavePipelineTool(srv.client))
+	// You can add manual tools if you want here.
 
 	return s, nil
 }
