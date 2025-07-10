@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp-server-stdin"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp_server_stdin"
 )
 
 func main() {

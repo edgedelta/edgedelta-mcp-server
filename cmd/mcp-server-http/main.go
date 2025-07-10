@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp-server-http"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp_server_http"
 )
 
 func main() {
