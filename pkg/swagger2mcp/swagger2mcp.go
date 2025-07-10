@@ -70,7 +70,7 @@ func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *s
 			if !hasAllowedTag(operation.Tags, allowedTags) {
 				continue
 			}
-			toolToHandler, err := createToolToHandler(httpClient, apiURL, path, method, operation)
+			toolToHandler, err := createToolToHandler(httpClient, apiURL, path, method, operation, swaggerSpec)
 			if err != nil {
 				return nil, err
 			}
@@ -81,7 +81,7 @@ func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *s
 	return toolToHandlerSlice, nil
 }
 
-func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation *spec.Operation) (ToolToHandler, error) {
+func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation *spec.Operation, swaggerSpec *spec.Swagger) (ToolToHandler, error) {
 	toolName, err := getToolName(operation)
 	if err != nil {
 		return ToolToHandler{}, err
@@ -93,7 +93,7 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 		return ToolToHandler{}, err
 	}
 
-	inputSchema, err := inputSchemaFromOperation(operation)
+	inputSchema, err := inputSchemaFromOperation(operation, swaggerSpec)
 	if err != nil {
 		return ToolToHandler{}, err
 	}
@@ -144,7 +144,7 @@ func hasAllowedTag(tags []string, allowedTags []string) bool {
 	return false
 }
 
-func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
+func inputSchemaFromOperation(operation *spec.Operation, swaggerSpec *spec.Swagger) ([]byte, error) {
 	schema := map[string]any{
 		"type":       "object",
 		"properties": map[string]any{},
@@ -161,6 +161,10 @@ func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
 			}{
 				SchemaProps: param.Schema.SchemaProps,
 				Description: param.Description,
+			}
+
+			if err := spec.ExpandSchema(param.Schema, swaggerSpec, nil); err != nil {
+				return nil, fmt.Errorf("failed to expand schema for param %s: %w", param.Name, err)
 			}
 
 			properties[param.Name] = bodySchema

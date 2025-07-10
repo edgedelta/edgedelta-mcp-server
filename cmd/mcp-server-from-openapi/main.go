@@ -13,8 +13,8 @@ import (
 
 const (
 	edAPITokenHeader = "X-ED-API-Token"
-	edgeDeltaAPIURL  = "https://api.edgedelta.com"
-	openAPIDocURL    = "https://api.edgedelta.com/swagger/doc.json"
+	edgeDeltaAPIURL  = "https://api.staging.edgedelta.com"
+	openAPIDocURL    = "https://api.staging.edgedelta.com/swagger/doc.json"
 	mcpServerName    = "edgedelta-mcp-server"
 	mcpServerVersion = "0.0.1"
 	mcpServerPort    = 8080
