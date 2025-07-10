@@ -14,7 +14,7 @@ builds:
       - linux
       - windows
       - darwin
-    main: ./cmd/mcp-server
+    main: ./cmd/mcp-server-stdin
 
 archives:
   - formats: tar.gz
