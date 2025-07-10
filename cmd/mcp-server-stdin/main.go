@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp-server-stdin/cmd"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/mcp-server-stdin"
 )
 
 func main() {
@@ -14,17 +14,17 @@ func main() {
 		log.Fatal("ED_API_TOKEN environment variable not set")
 	}
 
-	var opts []cmd.ServerOption
+	var opts []mcp_server_stdin.ServerOption
 	if apiURL := os.Getenv("ED_API_URL"); apiURL != "" {
-		opts = append(opts, cmd.WithAPIURL(apiURL))
+		opts = append(opts, mcp_server_stdin.WithAPIURL(apiURL))
 	}
 	if openAPIDocURL := os.Getenv("ED_OPENAPI_DOC_URL"); openAPIDocURL != "" {
-		opts = append(opts, cmd.WithOpenAPIDocURL(openAPIDocURL))
+		opts = append(opts, mcp_server_stdin.WithOpenAPIDocURL(openAPIDocURL))
 	}
 
-	opts = append(opts, cmd.WithAllowedTags([]string{"AI"}))
+	opts = append(opts, mcp_server_stdin.WithAllowedTags([]string{"AI"}))
 
-	mcpServer, err := cmd.NewEdgeDeltaMCPStdinServer(apiToken, opts...)
+	mcpServer, err := mcp_server_stdin.NewEdgeDeltaMCPStdinServer(apiToken, opts...)
 	if err != nil {
 		log.Fatal(err)
 	}
