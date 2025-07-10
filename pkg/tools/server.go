@@ -402,6 +402,7 @@ func CreateServer(version string, spec *OpenAPISpec, apiURL string, allowedTags 
 	}
 
 	// You can add manual tools if you want here.
+	s.AddTool(GetPipelinesTool(srv.client))
 
 	return s, nil
 }
