@@ -24,8 +24,8 @@ type FacetOption struct {
 }
 
 var FacetsTool = mcp.NewTool("facets",
-  mcp.WithDescription("Retrieves facets for the given scope. This can be used to filter search results."),
-  mcp.WithString("scope",
+	mcp.WithDescription("Retrieves facets for the given scope. This can be used to filter search results."),
+	mcp.WithString("scope",
 		mcp.Description("The scope to retrieve facets for. Available scopes: 'log', 'metric', 'trace'"),
 		mcp.Required(),
 		mcp.Enum("log", "metric", "trace"),
@@ -33,10 +33,10 @@ var FacetsTool = mcp.NewTool("facets",
 )
 
 var FacetsResource = mcp.NewResourceTemplate(
-  "facets://{scope}",
-  "Facets",
-  mcp.WithTemplateDescription("Facets for the given scope."),
-  mcp.WithTemplateMIMEType("application/json"),
+	"facets://{scope}",
+	"Facets",
+	mcp.WithTemplateDescription("Facets for the given scope."),
+	mcp.WithTemplateMIMEType("application/json"),
 )
 
 var FacetOptionsTool = mcp.NewTool("facet_options",
@@ -64,47 +64,47 @@ var FacetOptionsResource = mcp.NewResourceTemplate(
 )
 
 func FacetsToolHandler(client Client) server.ToolHandlerFunc {
-  return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    scope, err := request.RequireString("scope")
-    if err != nil {
-      return mcp.NewToolResultError("missing required parameter: scope"), err
-    }
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		scope, err := request.RequireString("scope")
+		if err != nil {
+			return mcp.NewToolResultError("missing required parameter: scope"), err
+		}
 
-    result, err := client.GetFacets(ctx, WithScope(scope))
-    if err != nil {
-      return nil, fmt.Errorf("failed to get facets, err: %w", err)
-    }
-    r, err := json.Marshal(result)
-    if err != nil {
-      return nil, fmt.Errorf("failed to marshal response, err: %w", err)
-    }
+		result, err := GetFacets(ctx, client, WithScope(scope))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get facets, err: %w", err)
+		}
+		r, err := json.Marshal(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+		}
 
-    return mcp.NewToolResultText(string(r)), nil
-  }
+		return mcp.NewToolResultText(string(r)), nil
+	}
 }
 
 func FacetsResourceHandler(client Client) server.ResourceTemplateHandlerFunc {
-  return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-    scope, err := extractScopeFromURI(request.Params.URI)
-    if err != nil {
-      return nil, fmt.Errorf("failed to extract scope from URI: %w", err)
-    }
-    result, err := client.GetFacets(ctx, WithScope(scope))
-    if err != nil {
-      return nil, fmt.Errorf("failed to get facets, err: %w", err)
-    }
-    r, err := json.Marshal(result)
-    if err != nil {
-      return nil, fmt.Errorf("failed to marshal response, err: %w", err)
-    }
-    return []mcp.ResourceContents{
-      mcp.TextResourceContents{
-        URI:      request.Params.URI,
-        MIMEType: "application/json",
-        Text:     string(r),
-      },
-    }, nil
-  }
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		scope, err := extractScopeFromURI(request.Params.URI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract scope from URI: %w", err)
+		}
+		result, err := GetFacets(ctx, client, WithScope(scope))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get facets, err: %w", err)
+		}
+		r, err := json.Marshal(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+		}
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     string(r),
+			},
+		}, nil
+	}
 }
 
 func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
@@ -122,7 +122,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError("invalid parameter: limit"), err
 		}
 
-		result, err := client.GetFacetOptions(ctx, WithScope(scope), WithFacet(facet), WithLimit(limit))
+		result, err := GetFacetOptions(ctx, client, WithScope(scope), WithFacet(facet), WithLimit(limit))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get facet options, err: %w", err)
 		}
@@ -135,14 +135,13 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 	}
 }
 
-
 func FacetOptionsResourceHandler(client Client) server.ResourceTemplateHandlerFunc {
 	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		scope, facet, err := extractScopeFacetFromURI(request.Params.URI)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract facet options from URI: %w", err)
 		}
-		result, err := client.GetFacetOptions(ctx, WithScope(scope), WithFacet(facet), WithLimit("100"))
+		result, err := GetFacetOptions(ctx, client, WithScope(scope), WithFacet(facet), WithLimit("100"))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get facet options, err: %w", err)
 		}
@@ -177,12 +176,12 @@ func WithFacet(facet string) QueryParamOption {
 }
 
 func extractScopeFromURI(uri string) (string, error) {
-  re := regexp.MustCompile(`^facets://([^/]+)$`)
-  matches := re.FindStringSubmatch(uri)
-  if len(matches) == 2 {
-    return matches[1], nil
-  }
-  return "", fmt.Errorf("invalid format")
+	re := regexp.MustCompile(`^facets://([^/]+)$`)
+	matches := re.FindStringSubmatch(uri)
+	if len(matches) == 2 {
+		return matches[1], nil
+	}
+	return "", fmt.Errorf("invalid format")
 }
 
 func extractScopeFacetFromURI(uri string) (string, string, error) {

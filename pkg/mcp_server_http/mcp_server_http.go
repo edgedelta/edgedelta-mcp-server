@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -163,6 +164,8 @@ func NewEdgeDeltaMCPHTTPServer(opts ...HTTPServerOption) (*MCPHTTPServer, error)
 	for _, toolToHandler := range toolToHandlers {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
+	tools.AddCustomTools(s, httpClient)
+	tools.AddCustomResources(s, httpClient)
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {

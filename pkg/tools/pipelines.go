@@ -31,7 +31,7 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			if err != nil {
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
 			}
-			result, err := client.GetPipelines(ctx, WithLimit(limit), WithKeyword(keyword))
+			result, err := GetPipelines(ctx, client, WithLimit(limit), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}
