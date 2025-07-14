@@ -16,6 +16,8 @@ type QueryParamOption func(url.Values)
 type Client interface {
 	GetPipelines(ctx context.Context, opts ...QueryParamOption) ([]PipelineSummary, error)
 	SavePipeline(ctx context.Context, confID, description, pipeline, content string) (map[string]interface{}, error)
+	GetFacets(ctx context.Context, opts ...QueryParamOption) ([]Facet, error)
+	GetFacetOptions(ctx context.Context, opts ...QueryParamOption) (*Facet, error)
 }
 
 // EnvironmentType represents the deployment environment

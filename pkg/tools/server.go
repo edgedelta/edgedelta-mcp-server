@@ -403,6 +403,11 @@ func CreateServer(version string, spec *OpenAPISpec, apiURL string, allowedTags 
 
 	// You can add manual tools if you want here.
 	s.AddTool(GetPipelinesTool(srv.client))
+	s.AddTool(FacetsTool, FacetsToolHandler(srv.client))
+	s.AddTool(FacetOptionsTool, FacetOptionsToolHandler(srv.client))
+
+	s.AddResourceTemplate(FacetsResource, FacetsResourceHandler(srv.client))
+	s.AddResourceTemplate(FacetOptionsResource, FacetOptionsResourceHandler(srv.client))
 
 	return s, nil
 }

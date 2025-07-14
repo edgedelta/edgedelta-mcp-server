@@ -184,6 +184,76 @@ func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption)
 	return returnPipelines, nil
 }
 
+func (c *HTTPClient) GetFacets(ctx context.Context, opts ...QueryParamOption) ([]Facet, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := c.createRequest(ctx, facetsURL, token, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create facets request: %v", err)
+	}
+
+	resp, err := c.cl.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch facets, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var facets []Facet
+	if err := json.NewDecoder(resp.Body).Decode(&facets); err != nil {
+		return nil, fmt.Errorf("failed to decode facets response: %v", err)
+	}
+
+	return facets, nil
+}
+
+func (c *HTTPClient) GetFacetOptions(ctx context.Context, opts ...QueryParamOption) (*Facet, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := c.createRequest(ctx, facetURL, token, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create facet options request: %v", err)
+	}
+
+	resp, err := c.cl.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch facet options, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var facet Facet
+	if err := json.NewDecoder(resp.Body).Decode(&facet); err != nil {
+		return nil, fmt.Errorf("failed to decode facet options response: %v", err)
+	}
+
+	return &facet, nil
+}
+
 func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
