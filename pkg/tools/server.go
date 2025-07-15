@@ -93,7 +93,7 @@ func newServer(spec *OpenAPISpec, apiURL string, allowedTags []string) *Server {
 		tagMap[tag] = struct{}{}
 	}
 
-	httpClient := NewHTTPlient()
+	httpClient := NewHTTPClient()
 	return &Server{
 		allowedTags: tagMap,
 		spec:        spec,
@@ -362,7 +362,7 @@ func (s *Server) addQueryParameters(req *http.Request, parameters []Parameter, r
 
 // FetchSpec fetches and parses the OpenAPI spec from a URL
 func FetchSpec(url string) (*OpenAPISpec, error) {
-	httpClient := NewHTTPlient()
+	httpClient := NewHTTPClient()
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
@@ -402,9 +402,21 @@ func CreateServer(version string, spec *OpenAPISpec, apiURL string, allowedTags 
 	}
 
 	// You can add manual tools if you want here.
-	s.AddTool(GetPipelinesTool(srv.client))
+	AddCustomTools(s, srv.client)
+	AddCustomResources(s, srv.client)
 
 	return s, nil
+}
+
+func AddCustomTools(s *server.MCPServer, client Client) {
+	s.AddTool(GetPipelinesTool(client))
+	s.AddTool(FacetsTool, FacetsToolHandler(client))
+	s.AddTool(FacetOptionsTool, FacetOptionsToolHandler(client))
+}
+
+func AddCustomResources(s *server.MCPServer, client Client) {
+	s.AddResourceTemplate(FacetsResource, FacetsResourceHandler(client))
+	s.AddResourceTemplate(FacetOptionsResource, FacetOptionsResourceHandler(client))
 }
 
 func getDescription(path, method string, operation Operation) string {
