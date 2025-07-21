@@ -46,9 +46,15 @@ func CreateServer(serverType ServerType, apiToken string, opts ...ServerOption) 
 	}
 }
 
-func AddCustomTools(s *server.MCPServer) {
-	client := tools.NewHTTPClient()
+func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.GetPipelinesTool(client))
+	s.AddTool(tools.FacetsTool, tools.FacetsToolHandler(client))
+	s.AddTool(tools.FacetOptionsTool, tools.FacetOptionsToolHandler(client))
+}
+
+func AddCustomResources(s *server.MCPServer, client tools.Client) {
+	s.AddResourceTemplate(tools.FacetsResource, tools.FacetsResourceHandler(client))
+	s.AddResourceTemplate(tools.FacetOptionsResource, tools.FacetOptionsResourceHandler(client))
 }
 
 // serverConfig holds internal configuration

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -40,12 +41,7 @@ func NewHTTPServer(opts ...ServerOption) (Server, error) {
 		opt(&config)
 	}
 
-	httpClient := &http.Client{
-		Transport: &AuthTransport{
-			RoundTripper:   http.DefaultTransport,
-			APITokenHeader: config.apiTokenHeader,
-		},
-	}
+	httpClient := tools.NewHTTPClient(config.apiTokenHeader)
 
 	toolToHandlers, err := swagger2mcp.NewToolsFromURL(
 		config.openAPIDocURL,
@@ -94,4 +90,8 @@ func (m *MCPHTTPServer) Start(_ context.Context) error {
 // Port returns the configured port
 func (m *MCPHTTPServer) Port() int {
 	return m.config.port
+}
+
+func SetTokenInContext(ctx context.Context, apiToken string) context.Context {
+	return context.WithValue(ctx, tools.APITokenKey, apiToken)
 }

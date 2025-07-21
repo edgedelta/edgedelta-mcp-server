@@ -44,13 +44,19 @@ var (
 	}
 )
 
+type Key string
+
+var APITokenKey Key = "apiToken"
+
 type HTTPClient struct {
-	cl *http.Client
+	cl             *http.Client
+	APITokenHeader string
 }
 
-func NewHTTPClient() *HTTPClient {
+func NewHTTPClient(apiTokenHeader string) *HTTPClient {
 	return &HTTPClient{
-		cl: newHTTPClientFunc(),
+		cl:             newHTTPClientFunc(),
+		APITokenHeader: apiTokenHeader,
 	}
 }
 
@@ -60,6 +66,13 @@ func (c *HTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 func (c *HTTPClient) Get(url string) (*http.Response, error) {
 	return c.cl.Get(url)
+}
+
+func (c *HTTPClient) RoundTrip(req *http.Request) (*http.Response, error) {
+	if token, ok := TokenKeyFromContext(req.Context()); ok {
+		req.Header.Set(c.APITokenHeader, token)
+	}
+	return c.cl.Transport.RoundTrip(req)
 }
 
 func WithKeyword(keyword string) QueryParamOption {
@@ -313,6 +326,20 @@ func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOptio
 	}
 
 	return &facet, nil
+}
+
+func TokenKeyFromContext(ctx context.Context) (string, bool) {
+	value := ctx.Value(APITokenKey)
+	if value == nil {
+		return "", false
+	}
+
+	token, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+
+	return token, true
 }
 
 func createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
