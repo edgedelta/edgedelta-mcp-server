@@ -117,7 +117,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError("missing required parameter: scope"), err
 		}
-		limit, err := optionalParam[string](request, "limit")
+		limit, err := OptionalParam[string](request, "limit")
 		if err != nil {
 			return mcp.NewToolResultError("invalid parameter: limit"), err
 		}

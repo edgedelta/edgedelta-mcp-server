@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
+
 	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -279,42 +281,22 @@ func addQueryParameters(req *http.Request, parameters []spec.Parameter, request 
 		// Use type-safe parameter extraction based on OpenAPI spec
 		switch paramType {
 		case "integer", "number":
-			if value, err := optionalParam[float64](request, param.Name); err == nil && value != 0 {
+			if value, err := tools.OptionalParam[float64](request, param.Name); err == nil && value != 0 {
 				query.Add(param.Name, fmt.Sprintf("%v", value))
 			}
 		case "boolean":
-			if value, err := optionalParam[bool](request, param.Name); err == nil {
+			if value, err := tools.OptionalParam[bool](request, param.Name); err == nil {
 				query.Add(param.Name, fmt.Sprintf("%t", value))
 			}
 		default:
 			// Handle string and unknown types
-			if value, err := optionalParam[string](request, param.Name); err == nil && value != "" {
+			if value, err := tools.OptionalParam[string](request, param.Name); err == nil && value != "" {
 				query.Add(param.Name, value)
 			}
 		}
 	}
 
 	req.URL.RawQuery = query.Encode()
-}
-
-// optionalParam is a helper function that can be used to fetch a requested parameter from the request.
-// It does the following checks:
-// 1. Checks if the parameter is present in the request, if not, it returns its zero-value
-// 2. If it is present, it checks if the parameter is of the expected type and returns it
-func optionalParam[T any](r mcp.CallToolRequest, p string) (T, error) {
-	var zero T
-
-	// Check if the parameter is present in the request
-	if _, ok := r.GetArguments()[p]; !ok {
-		return zero, nil
-	}
-
-	// Check if the parameter is of the expected type
-	if _, ok := r.GetArguments()[p].(T); !ok {
-		return zero, fmt.Errorf("parameter %s is not of type %T, is %T", p, zero, r.GetArguments()[p])
-	}
-
-	return r.GetArguments()[p].(T), nil
 }
 
 // buildURL builds the full URL with path parameters
