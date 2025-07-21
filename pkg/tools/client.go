@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 var (
@@ -46,7 +48,7 @@ type HTTPClient struct {
 	cl *http.Client
 }
 
-func NewHTTPlient() *HTTPClient {
+func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{
 		cl: newHTTPClientFunc(),
 	}
@@ -76,7 +78,7 @@ func WithLimit(limit string) QueryParamOption {
 	}
 }
 
-func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption) ([]PipelineSummary, error) {
+func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) ([]PipelineSummary, error) {
 	apiURL, orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -87,11 +89,11 @@ func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption)
 		return nil, err
 	}
 
-	req, err := c.createRequest(ctx, pipelineURL, token)
+	req, err := createRequest(ctx, pipelineURL, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pipelines request, err: %v", err)
 	}
-	resp, err := c.cl.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -184,24 +186,7 @@ func (c *HTTPClient) GetPipelines(ctx context.Context, opts ...QueryParamOption)
 	return returnPipelines, nil
 }
 
-func (c *HTTPClient) createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
-	queryValues := url.Values{}
-	for _, opt := range opts {
-		opt(queryValues)
-	}
-
-	reqUrl.RawQuery = queryValues.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
-	return req, nil
-}
-
-func (c *HTTPClient) SavePipeline(ctx context.Context, confID, description, pipeline, content string) (map[string]interface{}, error) {
+func SavePipeline(ctx context.Context, client Client, confID, description, pipeline, content string) (map[string]interface{}, error) {
 	apiURL, orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -241,7 +226,7 @@ func (c *HTTPClient) SavePipeline(ctx context.Context, confID, description, pipe
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-ED-API-Token", token)
 
-	resp, err := c.cl.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -258,4 +243,111 @@ func (c *HTTPClient) SavePipeline(ctx context.Context, confID, description, pipe
 	}
 
 	return result, nil
+}
+
+func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]Facet, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, facetsURL, token, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create facets request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch facets, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var facets []Facet
+	if err := json.NewDecoder(resp.Body).Decode(&facets); err != nil {
+		return nil, fmt.Errorf("failed to decode facets response: %v", err)
+	}
+
+	return facets, nil
+}
+
+func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOption) (*Facet, error) {
+	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", apiURL, orgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, facetURL, token, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create facet options request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch facet options, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var facet Facet
+	if err := json.NewDecoder(resp.Body).Decode(&facet); err != nil {
+		return nil, fmt.Errorf("failed to decode facet options response: %v", err)
+	}
+
+	return &facet, nil
+}
+
+func createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
+	queryValues := url.Values{}
+	for _, opt := range opts {
+		opt(queryValues)
+	}
+
+	reqUrl.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-ED-API-Token", token)
+	return req, nil
+}
+
+// optionalParam is a helper function that can be used to fetch a requested parameter from the request.
+// It does the following checks:
+// 1. Checks if the parameter is present in the request, if not, it returns its zero-value
+// 2. If it is present, it checks if the parameter is of the expected type and returns it
+func optionalParam[T any](r mcp.CallToolRequest, p string) (T, error) {
+	var zero T
+
+	// Check if the parameter is present in the request
+	if _, ok := r.GetArguments()[p]; !ok {
+		return zero, nil
+	}
+
+	// Check if the parameter is of the expected type
+	if _, ok := r.GetArguments()[p].(T); !ok {
+		return zero, fmt.Errorf("parameter %s is not of type %T, is %T", p, zero, r.GetArguments()[p])
+	}
+
+	return r.GetArguments()[p].(T), nil
 }

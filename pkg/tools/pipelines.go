@@ -23,9 +23,15 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			limit := request.GetString("limit", "5")
-			keyword := request.GetString("keyword", "")
-			result, err := client.GetPipelines(ctx, WithLimit(limit), WithKeyword(keyword))
+			limit, err := optionalParam[string](request, "limit")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get limit, err: %w", err)
+			}
+			keyword, err := optionalParam[string](request, "keyword")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
+			}
+			result, err := GetPipelines(ctx, client, WithLimit(limit), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}

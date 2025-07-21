@@ -47,7 +47,7 @@ func CreateServer(serverType ServerType, apiToken string, opts ...ServerOption) 
 }
 
 func AddCustomTools(s *server.MCPServer) {
-	client := tools.NewHTTPlient()
+	client := tools.NewHTTPClient()
 	s.AddTool(tools.GetPipelinesTool(client))
 }
 
