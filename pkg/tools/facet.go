@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -117,7 +119,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError("missing required parameter: scope"), err
 		}
-		limit, err := OptionalParam[string](request, "limit")
+		limit, err := params.Optional[string](request, "limit")
 		if err != nil {
 			return mcp.NewToolResultError("invalid parameter: limit"), err
 		}

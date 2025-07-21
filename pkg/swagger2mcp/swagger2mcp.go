@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
 
 	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -281,16 +281,16 @@ func addQueryParameters(req *http.Request, parameters []spec.Parameter, request 
 		// Use type-safe parameter extraction based on OpenAPI spec
 		switch paramType {
 		case "integer", "number":
-			if value, err := tools.OptionalParam[float64](request, param.Name); err == nil && value != 0 {
+			if value, err := params.Optional[float64](request, param.Name); err == nil && value != 0 {
 				query.Add(param.Name, fmt.Sprintf("%v", value))
 			}
 		case "boolean":
-			if value, err := tools.OptionalParam[bool](request, param.Name); err == nil {
+			if value, err := params.Optional[bool](request, param.Name); err == nil {
 				query.Add(param.Name, fmt.Sprintf("%t", value))
 			}
 		default:
 			// Handle string and unknown types
-			if value, err := tools.OptionalParam[string](request, param.Name); err == nil && value != "" {
+			if value, err := params.Optional[string](request, param.Name); err == nil && value != "" {
 				query.Add(param.Name, value)
 			}
 		}
