@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"context"
+	"net/http"
 	"net/url"
 )
 
@@ -12,10 +12,9 @@ const (
 
 type QueryParamOption func(url.Values)
 
-// Client interface defines the methods for interacting with Edge Delta API
 type Client interface {
-	GetPipelines(ctx context.Context, opts ...QueryParamOption) ([]PipelineSummary, error)
-	SavePipeline(ctx context.Context, confID, description, pipeline, content string) (map[string]interface{}, error)
+	Do(req *http.Request) (*http.Response, error)
+	Get(url string) (*http.Response, error)
 }
 
 // EnvironmentType represents the deployment environment

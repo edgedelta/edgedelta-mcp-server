@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -153,6 +154,8 @@ func NewEdgeDeltaMCPStdinServer(apiToken string, opts ...ServerOption) (*MCPServ
 	for _, toolToHandler := range toolToHandlers {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
+	tools.AddCustomTools(s, httpClient)
+	tools.AddCustomResources(s, httpClient)
 
 	stdioServer := server.NewStdioServer(s)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
