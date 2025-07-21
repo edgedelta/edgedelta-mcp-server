@@ -58,6 +58,8 @@ func NewHTTPServer(opts ...ServerOption) (Server, error) {
 	for _, toolToHandler := range toolToHandlers {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
+	AddCustomTools(s, httpClient)
+	AddCustomResources(s, httpClient)
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {

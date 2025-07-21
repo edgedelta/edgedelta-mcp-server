@@ -53,6 +53,7 @@ func NewStdinServer(apiToken string, opts ...ServerOption) (Server, error) {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
 	AddCustomTools(s, httpClient)
+	AddCustomResources(s, httpClient)
 
 	stdioServer := server.NewStdioServer(s)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
