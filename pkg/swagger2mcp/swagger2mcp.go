@@ -9,10 +9,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
+
 	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+type client interface {
+	Get(url string) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
+}
 
 // ToolToHandler encapsulates a tool and its handler
 type ToolToHandler struct {
@@ -20,8 +27,8 @@ type ToolToHandler struct {
 	Handler server.ToolHandlerFunc
 }
 
-func fetchOpenAPISpec(httpClient *http.Client, url string) (*spec.Swagger, error) {
-	resp, err := httpClient.Get(url)
+func fetchOpenAPISpec(cl client, url string) (*spec.Swagger, error) {
+	resp, err := cl.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
 	}
@@ -51,7 +58,7 @@ func fetchOpenAPISpec(httpClient *http.Client, url string) (*spec.Swagger, error
 	return swaggerSpec, nil
 }
 
-func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
+func createToolToHandlers(apiURL string, cl client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
 	var toolToHandlerSlice []ToolToHandler
 
 	for path, pathItem := range swaggerSpec.Paths.Paths {
@@ -70,7 +77,7 @@ func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *s
 			if !hasAllowedTag(operation.Tags, allowedTags) {
 				continue
 			}
-			toolToHandler, err := createToolToHandler(httpClient, apiURL, path, method, operation, swaggerSpec)
+			toolToHandler, err := createToolToHandler(cl, apiURL, path, method, operation, swaggerSpec)
 			if err != nil {
 				return nil, err
 			}
@@ -81,7 +88,7 @@ func createToolToHandlers(apiURL string, httpClient *http.Client, swaggerSpec *s
 	return toolToHandlerSlice, nil
 }
 
-func createToolToHandler(httpClient *http.Client, apiURL, path, method string, operation *spec.Operation, swaggerSpec *spec.Swagger) (ToolToHandler, error) {
+func createToolToHandler(cl client, apiURL, path, method string, operation *spec.Operation, swaggerSpec *spec.Swagger) (ToolToHandler, error) {
 	toolName, err := getToolName(operation)
 	if err != nil {
 		return ToolToHandler{}, err
@@ -100,7 +107,7 @@ func createToolToHandler(httpClient *http.Client, apiURL, path, method string, o
 	tool := mcp.NewToolWithRawSchema(toolName, description, inputSchema)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return makeOpenAPICall(ctx, httpClient, request, apiURL, path, method, operation)
+		return makeOpenAPICall(ctx, cl, request, apiURL, path, method, operation)
 	}
 
 	return ToolToHandler{
@@ -193,7 +200,7 @@ func inputSchemaFromOperation(operation *spec.Operation, swaggerSpec *spec.Swagg
 
 func makeOpenAPICall(
 	ctx context.Context,
-	httpClient *http.Client,
+	cl client,
 	request mcp.CallToolRequest,
 	apiURL, path, method string,
 	operation *spec.Operation,
@@ -240,7 +247,7 @@ func makeOpenAPICall(
 
 	// Note: Attach headers through the roundtripper. The roundtripper will fetch the headers from the context.
 	// The context will be updated with the headers from the request.
-	resp, err := httpClient.Do(req)
+	resp, err := cl.Do(req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to execute request: %v", err)), nil
 	}
@@ -274,42 +281,22 @@ func addQueryParameters(req *http.Request, parameters []spec.Parameter, request 
 		// Use type-safe parameter extraction based on OpenAPI spec
 		switch paramType {
 		case "integer", "number":
-			if value, err := optionalParam[float64](request, param.Name); err == nil && value != 0 {
+			if value, err := params.Optional[float64](request, param.Name); err == nil && value != 0 {
 				query.Add(param.Name, fmt.Sprintf("%v", value))
 			}
 		case "boolean":
-			if value, err := optionalParam[bool](request, param.Name); err == nil {
+			if value, err := params.Optional[bool](request, param.Name); err == nil {
 				query.Add(param.Name, fmt.Sprintf("%t", value))
 			}
 		default:
 			// Handle string and unknown types
-			if value, err := optionalParam[string](request, param.Name); err == nil && value != "" {
+			if value, err := params.Optional[string](request, param.Name); err == nil && value != "" {
 				query.Add(param.Name, value)
 			}
 		}
 	}
 
 	req.URL.RawQuery = query.Encode()
-}
-
-// optionalParam is a helper function that can be used to fetch a requested parameter from the request.
-// It does the following checks:
-// 1. Checks if the parameter is present in the request, if not, it returns its zero-value
-// 2. If it is present, it checks if the parameter is of the expected type and returns it
-func optionalParam[T any](r mcp.CallToolRequest, p string) (T, error) {
-	var zero T
-
-	// Check if the parameter is present in the request
-	if _, ok := r.GetArguments()[p]; !ok {
-		return zero, nil
-	}
-
-	// Check if the parameter is of the expected type
-	if _, ok := r.GetArguments()[p].(T); !ok {
-		return zero, fmt.Errorf("parameter %s is not of type %T, is %T", p, zero, r.GetArguments()[p])
-	}
-
-	return r.GetArguments()[p].(T), nil
 }
 
 // buildURL builds the full URL with path parameters
@@ -338,20 +325,20 @@ func WithAllowedTags(allowedTags []string) NewToolsFromSpecOption {
 	}
 }
 
-func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
+func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, cl client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
 	var options ToolsFromSpecOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	return createToolToHandlers(apiURL, httpClient, swaggerSpec, options.AllowedTags)
+	return createToolToHandlers(apiURL, cl, swaggerSpec, options.AllowedTags)
 }
 
-func NewToolsFromURL(url, apiURL string, httpClient *http.Client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
-	spec, err := fetchOpenAPISpec(httpClient, url)
+func NewToolsFromURL(url, apiURL string, cl client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
+	spec, err := fetchOpenAPISpec(cl, url)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewToolsFromSpec(apiURL, spec, httpClient, opts...)
+	return NewToolsFromSpec(apiURL, spec, cl, opts...)
 }
