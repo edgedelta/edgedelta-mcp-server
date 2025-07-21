@@ -22,7 +22,10 @@ type MCPServer struct {
 }
 
 // NewStdinServer creates a new Edge Delta MCP server for stdin/stdout
-func NewStdinServer(apiToken string, opts ...ServerOption) (Server, error) {
+func NewStdinServer(orgID, apiToken string, opts ...ServerOption) (Server, error) {
+	if orgID == "" {
+		return nil, fmt.Errorf("ED_ORG_ID not set")
+	}
 	if apiToken == "" {
 		return nil, fmt.Errorf("ED_API_TOKEN not set")
 	}
@@ -57,7 +60,10 @@ func NewStdinServer(apiToken string, opts ...ServerOption) (Server, error) {
 
 	stdioServer := server.NewStdioServer(s)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
-		return SetTokenInContext(ctx, apiToken)
+		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
+		ctx = context.WithValue(ctx, tools.TokenKey, apiToken)
+		ctx = context.WithValue(ctx, tools.APIURLKey, config.apiURL)
+		return ctx
 	})
 
 	return &MCPServer{

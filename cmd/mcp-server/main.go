@@ -125,7 +125,8 @@ func runServer(cfg runConfig) error {
 	opts = append(opts, server.WithLogger(cfg.logger))
 
 	apiToken := os.Getenv("ED_API_TOKEN")
-	mcpServer, err := server.CreateServer(cfg.serverType, apiToken, opts...)
+	orgID := os.Getenv("ED_ORG_ID")
+	mcpServer, err := server.CreateServer(cfg.serverType, orgID, apiToken, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

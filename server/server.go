@@ -35,10 +35,10 @@ const (
 	HTTPServerType  ServerType = "http"
 )
 
-func CreateServer(serverType ServerType, apiToken string, opts ...ServerOption) (Server, error) {
+func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerOption) (Server, error) {
 	switch serverType {
 	case StdinServerType:
-		return NewStdinServer(apiToken, opts...)
+		return NewStdinServer(orgID, apiToken, opts...)
 	case HTTPServerType:
 		return NewHTTPServer(opts...)
 	default:
