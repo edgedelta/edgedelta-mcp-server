@@ -14,18 +14,14 @@ const (
 	APIURLKey ContextKey = "apiURL"
 )
 
-func FetchContextKeys(ctx context.Context) (string, string, string, error) {
-	apiURL, ok := ctx.Value(APIURLKey).(string)
-	if !ok {
-		return "", "", "", fmt.Errorf("apiURL not found in context")
-	}
+func FetchContextKeys(ctx context.Context) (string, string, error) {
 	orgID, ok := ctx.Value(OrgIDKey).(string)
 	if !ok {
-		return "", "", "", fmt.Errorf("orgID not found in context")
+		return "", "", fmt.Errorf("orgID not found in context")
 	}
 	token, ok := ctx.Value(TokenKey).(string)
 	if !ok {
-		return "", "", "", fmt.Errorf("token not found in context")
+		return "", "", fmt.Errorf("token not found in context")
 	}
-	return apiURL, orgID, token, nil
+	return orgID, token, nil
 }

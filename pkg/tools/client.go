@@ -42,19 +42,17 @@ var (
 	}
 )
 
-type Key string
-
-var APITokenKey Key = "apiToken"
-
 type HTTPClient struct {
 	cl             *http.Client
-	APITokenHeader string
+	apiTokenHeader string
+	apiURL         string
 }
 
-func NewHTTPClient(apiTokenHeader string) *HTTPClient {
+func NewHTTPClient(apiURL, apiTokenHeader string) *HTTPClient {
 	return &HTTPClient{
 		cl:             newHTTPClientFunc(),
-		APITokenHeader: apiTokenHeader,
+		apiURL:         apiURL,
+		apiTokenHeader: apiTokenHeader,
 	}
 }
 
@@ -66,9 +64,13 @@ func (c *HTTPClient) Get(url string) (*http.Response, error) {
 	return c.cl.Get(url)
 }
 
+func (c *HTTPClient) APIURL() string {
+	return c.apiURL
+}
+
 func (c *HTTPClient) RoundTrip(req *http.Request) (*http.Response, error) {
-	if token, ok := TokenKeyFromContext(req.Context()); ok {
-		req.Header.Set(c.APITokenHeader, token)
+	if token, ok := tokenKeyFromContext(req.Context()); ok {
+		req.Header.Set(c.apiTokenHeader, token)
 	}
 	return c.cl.Transport.RoundTrip(req)
 }
@@ -90,12 +92,12 @@ func WithLimit(limit string) QueryParamOption {
 }
 
 func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) ([]PipelineSummary, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	pipelineURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines", apiURL, orgID))
+	pipelineURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines", client.APIURL(), orgID))
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +200,12 @@ func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) 
 }
 
 func SavePipeline(ctx context.Context, client Client, confID, description, pipeline, content string) (map[string]interface{}, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	saveURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/save", apiURL, orgID, confID))
+	saveURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/save", client.APIURL(), orgID, confID))
 	if err != nil {
 		return nil, err
 	}
@@ -257,12 +259,12 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 }
 
 func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]Facet, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", apiURL, orgID))
+	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", client.APIURL(), orgID))
 	if err != nil {
 		return nil, err
 	}
@@ -292,12 +294,12 @@ func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]
 }
 
 func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOption) (*Facet, error) {
-	apiURL, orgID, token, err := FetchContextKeys(ctx)
+	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", apiURL, orgID))
+	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", client.APIURL(), orgID))
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +328,8 @@ func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOptio
 	return &facet, nil
 }
 
-func TokenKeyFromContext(ctx context.Context) (string, bool) {
-	value := ctx.Value(APITokenKey)
+func tokenKeyFromContext(ctx context.Context) (string, bool) {
+	value := ctx.Value(TokenKey)
 	if value == nil {
 		return "", false
 	}

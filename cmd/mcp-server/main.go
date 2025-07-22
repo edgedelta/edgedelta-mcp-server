@@ -160,7 +160,7 @@ func main() {
 }
 
 func fetchOpenAPISpec() (*spec.Swagger, error) {
-	cl := tools.NewHTTPClient("")
+	cl := tools.NewHTTPClient("", "")
 
 	resp, err := cl.Get(openAPIDocURL)
 	if err != nil {

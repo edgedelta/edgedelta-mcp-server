@@ -39,7 +39,7 @@ const (
 func CreateServer(serverType ServerType, orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (Server, error) {
 	switch serverType {
 	case StdinServerType:
-		return NewStdinServer(orgID, apiToken, spec, opts...)
+		return NewStdioServer(orgID, apiToken, spec, opts...)
 	case HTTPServerType:
 		return NewHTTPServer(spec, opts...)
 	default:
