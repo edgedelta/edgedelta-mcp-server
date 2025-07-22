@@ -11,6 +11,7 @@ import (
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
+	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -22,7 +23,7 @@ type MCPServer struct {
 }
 
 // NewStdinServer creates a new Edge Delta MCP server for stdin/stdout
-func NewStdinServer(orgID, apiToken string, opts ...ServerOption) (Server, error) {
+func NewStdinServer(orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (*MCPServer, error) {
 	if orgID == "" {
 		return nil, fmt.Errorf("ED_ORG_ID not set")
 	}
@@ -40,9 +41,9 @@ func NewStdinServer(orgID, apiToken string, opts ...ServerOption) (Server, error
 
 	httpClient := tools.NewHTTPClient(config.apiTokenHeader)
 
-	toolToHandlers, err := swagger2mcp.NewToolsFromURL(
-		config.openAPIDocURL,
+	toolToHandlers, err := swagger2mcp.NewToolsFromSpec(
 		config.apiURL,
+		spec,
 		httpClient,
 		swagger2mcp.WithAllowedTags(config.allowedTags),
 	)

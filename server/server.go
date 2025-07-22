@@ -6,13 +6,14 @@ import (
 	"log/slog"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
+
+	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 var (
 	defaultServerConfig = serverConfig{
 		apiURL:         "https://api.edgedelta.com",
-		openAPIDocURL:  "https://api.edgedelta.com/swagger/doc.json",
 		serverName:     "edgedelta-mcp-server",
 		serverVersion:  "0.0.1",
 		allowedTags:    []string{"AI"},
@@ -35,12 +36,12 @@ const (
 	HTTPServerType  ServerType = "http"
 )
 
-func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerOption) (Server, error) {
+func CreateServer(serverType ServerType, orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (Server, error) {
 	switch serverType {
 	case StdinServerType:
-		return NewStdinServer(orgID, apiToken, opts...)
+		return NewStdinServer(orgID, apiToken, spec, opts...)
 	case HTTPServerType:
-		return NewHTTPServer(opts...)
+		return NewHTTPServer(spec, opts...)
 	default:
 		return nil, fmt.Errorf("invalid server type: %s", serverType)
 	}
@@ -60,7 +61,6 @@ func AddCustomResources(s *server.MCPServer, client tools.Client) {
 // serverConfig holds internal configuration
 type serverConfig struct {
 	apiURL         string
-	openAPIDocURL  string
 	serverName     string
 	serverVersion  string
 	allowedTags    []string
@@ -79,13 +79,6 @@ type ServerOption func(*serverConfig)
 func WithAPIURL(url string) ServerOption {
 	return func(c *serverConfig) {
 		c.apiURL = url
-	}
-}
-
-// WithOpenAPIDocURL sets the OpenAPI documentation URL
-func WithOpenAPIDocURL(url string) ServerOption {
-	return func(c *serverConfig) {
-		c.openAPIDocURL = url
 	}
 }
 

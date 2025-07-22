@@ -333,12 +333,3 @@ func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, cl client, opts 
 
 	return createToolToHandlers(apiURL, cl, swaggerSpec, options.AllowedTags)
 }
-
-func NewToolsFromURL(url, apiURL string, cl client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
-	spec, err := fetchOpenAPISpec(cl, url)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewToolsFromSpec(apiURL, spec, cl, opts...)
-}
