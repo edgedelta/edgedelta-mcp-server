@@ -22,8 +22,8 @@ type MCPServer struct {
 	config      *serverConfig
 }
 
-// NewStdinServer creates a new Edge Delta MCP server for stdin/stdout
-func NewStdinServer(orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (*MCPServer, error) {
+// NewStdioServer creates a new Edge Delta MCP server for stdin/stdout
+func NewStdioServer(orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (*MCPServer, error) {
 	if orgID == "" {
 		return nil, fmt.Errorf("ED_ORG_ID not set")
 	}
@@ -39,7 +39,7 @@ func NewStdinServer(orgID, apiToken string, spec *spec.Swagger, opts ...ServerOp
 		opt(&config)
 	}
 
-	httpClient := tools.NewHTTPClient(config.apiTokenHeader)
+	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
 	toolToHandlers, err := swagger2mcp.NewToolsFromSpec(
 		config.apiURL,
@@ -63,7 +63,6 @@ func NewStdinServer(orgID, apiToken string, spec *spec.Swagger, opts ...ServerOp
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
 		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
 		ctx = context.WithValue(ctx, tools.TokenKey, apiToken)
-		ctx = context.WithValue(ctx, tools.APIURLKey, config.apiURL)
 		return ctx
 	})
 

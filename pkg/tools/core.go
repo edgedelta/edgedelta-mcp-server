@@ -15,6 +15,7 @@ type QueryParamOption func(url.Values)
 type Client interface {
 	Do(req *http.Request) (*http.Response, error)
 	Get(url string) (*http.Response, error)
+	APIURL() string
 }
 
 // EnvironmentType represents the deployment environment

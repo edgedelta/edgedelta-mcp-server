@@ -9,6 +9,7 @@ import (
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/go-openapi/spec"
+	"github.com/gorilla/mux"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -42,7 +43,7 @@ func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, er
 		opt(&config)
 	}
 
-	httpClient := tools.NewHTTPClient(config.apiTokenHeader)
+	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
 	toolToHandlers, err := swagger2mcp.NewToolsFromSpec(
 		config.apiURL,
@@ -64,10 +65,24 @@ func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, er
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {
-		apiToken := r.Header.Get(config.apiTokenHeader)
+		// Check for API token in query parameters
+		apiToken := r.URL.Query().Get("token")
 		if apiToken != "" {
-			return SetTokenInContext(ctx, apiToken)
+			ctx = addToContext(ctx, tools.TokenKey, apiToken)
 		}
+
+		// Check for API token in headers
+		headerToken := r.Header.Get(config.apiTokenHeader)
+		if headerToken != "" {
+			ctx = addToContext(ctx, tools.TokenKey, headerToken)
+		}
+
+		// Check for org ID in path variables
+		orgID, ok := mux.Vars(r)["org_id"]
+		if ok && orgID != "" {
+			ctx = addToContext(ctx, tools.OrgIDKey, orgID)
+		}
+
 		return ctx
 	}
 
@@ -95,8 +110,8 @@ func (m *MCPHTTPServer) Port() int {
 	return m.config.port
 }
 
-func SetTokenInContext(ctx context.Context, apiToken string) context.Context {
-	return context.WithValue(ctx, tools.APITokenKey, apiToken)
+func addToContext(ctx context.Context, key tools.ContextKey, value string) context.Context {
+	return context.WithValue(ctx, key, value)
 }
 
 func (m *MCPHTTPServer) HTTPServer() *server.StreamableHTTPServer {
