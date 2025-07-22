@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -25,37 +24,6 @@ type client interface {
 type ToolToHandler struct {
 	Tool    mcp.Tool
 	Handler server.ToolHandlerFunc
-}
-
-func fetchOpenAPISpec(cl client, url string) (*spec.Swagger, error) {
-	resp, err := cl.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch URL, err: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response status code: %d when fetching URL", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body, err: %w", err)
-	}
-
-	swaggerSpec := &spec.Swagger{}
-	if err := json.Unmarshal(data, swaggerSpec); err != nil {
-		log.Fatalf("Failed to parse swagger.json: %v", err)
-	}
-
-	err = spec.ExpandSpec(swaggerSpec, &spec.ExpandOptions{
-		RelativeBase: "",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand spec: %w", err)
-	}
-
-	return swaggerSpec, nil
 }
 
 func createToolToHandlers(apiURL string, cl client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
