@@ -4,12 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+func WithKeyword(keyword string) QueryParamOption {
+	return func(v url.Values) {
+		if keyword != "" {
+			v.Add("keyword", keyword)
+		}
+	}
+}
+
+func WithLimit(limit string) QueryParamOption {
+	return func(v url.Values) {
+		if limit != "" {
+			v.Add("limit", limit)
+		}
+	}
+}
 
 // GetPipelinesTool creates a tool to search for logs.
 func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {

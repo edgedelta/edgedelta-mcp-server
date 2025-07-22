@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/gorilla/mux"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -60,8 +61,13 @@ func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, er
 	for _, toolToHandler := range toolToHandlers {
 		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
 	}
+
 	AddCustomTools(s, httpClient)
 	AddCustomResources(s, httpClient)
+
+	s.AddTool(mcp.NewTool("hello"), func(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return mcp.NewToolResultText(fmt.Sprintf("Hello from %s", config.serverName)), nil
+	})
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {

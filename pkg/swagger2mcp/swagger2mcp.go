@@ -1,14 +1,17 @@
 package swagger2mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -26,16 +29,16 @@ type ToolToHandler struct {
 	Handler server.ToolHandlerFunc
 }
 
-func createToolToHandlers(apiURL string, cl client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
+func createToolToHandlers(apiURL string, httpClient client, swaggerSpec *spec.Swagger, allowedTags []string) ([]ToolToHandler, error) {
 	var toolToHandlerSlice []ToolToHandler
 
 	for path, pathItem := range swaggerSpec.Paths.Paths {
 		operations := map[string]*spec.Operation{
-			"GET":    pathItem.Get,
-			"POST":   pathItem.Post,
-			"PUT":    pathItem.Put,
-			"DELETE": pathItem.Delete,
-			"PATCH":  pathItem.Patch,
+			http.MethodGet:    pathItem.Get,
+			http.MethodPost:   pathItem.Post,
+			http.MethodPut:    pathItem.Put,
+			http.MethodDelete: pathItem.Delete,
+			http.MethodPatch:  pathItem.Patch,
 		}
 
 		for method, operation := range operations {
@@ -45,7 +48,7 @@ func createToolToHandlers(apiURL string, cl client, swaggerSpec *spec.Swagger, a
 			if !hasAllowedTag(operation.Tags, allowedTags) {
 				continue
 			}
-			toolToHandler, err := createToolToHandler(cl, apiURL, path, method, operation, swaggerSpec)
+			toolToHandler, err := createToolToHandler(httpClient, apiURL, path, method, operation)
 			if err != nil {
 				return nil, err
 			}
@@ -56,7 +59,7 @@ func createToolToHandlers(apiURL string, cl client, swaggerSpec *spec.Swagger, a
 	return toolToHandlerSlice, nil
 }
 
-func createToolToHandler(cl client, apiURL, path, method string, operation *spec.Operation, swaggerSpec *spec.Swagger) (ToolToHandler, error) {
+func createToolToHandler(httpClient client, apiURL, path, method string, operation *spec.Operation) (ToolToHandler, error) {
 	toolName, err := getToolName(operation)
 	if err != nil {
 		return ToolToHandler{}, err
@@ -68,14 +71,14 @@ func createToolToHandler(cl client, apiURL, path, method string, operation *spec
 		return ToolToHandler{}, err
 	}
 
-	inputSchema, err := inputSchemaFromOperation(operation, swaggerSpec)
+	inputSchema, err := inputSchemaFromOperation(operation)
 	if err != nil {
 		return ToolToHandler{}, err
 	}
 	tool := mcp.NewToolWithRawSchema(toolName, description, inputSchema)
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return makeOpenAPICall(ctx, cl, request, apiURL, path, method, operation)
+		return makeOpenAPICall(ctx, httpClient, request, apiURL, path, method, operation)
 	}
 
 	return ToolToHandler{
@@ -87,7 +90,8 @@ func createToolToHandler(cl client, apiURL, path, method string, operation *spec
 func getToolName(operation *spec.Operation) (string, error) {
 	if operation.ID != "" {
 		return operation.ID, nil
-	} else if operation.Tags[0] != "" { // TODO: This is a fallback we'll get rid of once we ensure all operations have an ID.
+	}
+	if operation.Tags[0] != "" { // TODO: This is a fallback we'll get rid of once we ensure all operations have an ID.
 		lower := strings.ToLower(operation.Tags[0])
 		snakeCase := strings.ReplaceAll(lower, " ", "_")
 		return snakeCase, nil
@@ -98,7 +102,8 @@ func getToolName(operation *spec.Operation) (string, error) {
 func getDescription(operation *spec.Operation) (string, error) {
 	if operation.Description != "" {
 		return operation.Description, nil
-	} else if operation.Summary != "" {
+	}
+	if operation.Summary != "" {
 		return operation.Summary, nil
 	}
 	return "", fmt.Errorf("no description found for operation")
@@ -110,16 +115,14 @@ func hasAllowedTag(tags []string, allowedTags []string) bool {
 	}
 
 	for _, tag := range tags {
-		for _, allowedTag := range allowedTags {
-			if tag == allowedTag {
-				return true
-			}
+		if slices.Contains(allowedTags, tag) {
+			return true
 		}
 	}
 	return false
 }
 
-func inputSchemaFromOperation(operation *spec.Operation, swaggerSpec *spec.Swagger) ([]byte, error) {
+func inputSchemaFromOperation(operation *spec.Operation) ([]byte, error) {
 	schema := map[string]any{
 		"type":       "object",
 		"properties": map[string]any{},
@@ -138,12 +141,14 @@ func inputSchemaFromOperation(operation *spec.Operation, swaggerSpec *spec.Swagg
 				Description: param.Description,
 			}
 
-			if err := spec.ExpandSchema(param.Schema, swaggerSpec, nil); err != nil {
-				return nil, fmt.Errorf("failed to expand schema for param %s: %w", param.Name, err)
-			}
-
 			properties[param.Name] = bodySchema
 		} else {
+			// TODO: For now, we take org_id from the path which conflicts with the JSONRPC convention,
+			//  we can remove this trick in the future.
+			if param.Name == "org_id" {
+				continue
+			}
+
 			properties[param.Name] = map[string]any{
 				"type":        param.Type,
 				"description": param.Description,
@@ -168,7 +173,7 @@ func inputSchemaFromOperation(operation *spec.Operation, swaggerSpec *spec.Swagg
 
 func makeOpenAPICall(
 	ctx context.Context,
-	cl client,
+	httpClient client,
 	request mcp.CallToolRequest,
 	apiURL, path, method string,
 	operation *spec.Operation,
@@ -176,6 +181,11 @@ func makeOpenAPICall(
 	args, ok := request.Params.Arguments.(map[string]any)
 	if !ok {
 		return mcp.NewToolResultError("invalid arguments format"), nil
+	}
+
+	args["org_id"], ok = orgIDKeyFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("failed to get org_id from context"), nil
 	}
 
 	fullURL := buildURL(apiURL, path, args)
@@ -193,9 +203,11 @@ func makeOpenAPICall(
 	if bodyParam != nil {
 		// Get the JSON payload from arguments
 		if bodyData, exists := args[bodyParam.Name]; exists {
-			if bodyStr, ok := bodyData.(string); ok && bodyStr != "" {
-				requestBody = strings.NewReader(bodyStr)
+			bodyJSON, err := json.Marshal(bodyData)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to marshal body data: %v", err)), nil
 			}
+			requestBody = bytes.NewReader(bodyJSON)
 		}
 	}
 
@@ -215,7 +227,7 @@ func makeOpenAPICall(
 
 	// Note: Attach headers through the roundtripper. The roundtripper will fetch the headers from the context.
 	// The context will be updated with the headers from the request.
-	resp, err := cl.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to execute request: %v", err)), nil
 	}
@@ -293,11 +305,18 @@ func WithAllowedTags(allowedTags []string) NewToolsFromSpecOption {
 	}
 }
 
-func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, cl client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
+func NewToolsFromSpec(apiURL string, swaggerSpec *spec.Swagger, httpClient client, opts ...NewToolsFromSpecOption) ([]ToolToHandler, error) {
 	var options ToolsFromSpecOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	return createToolToHandlers(apiURL, cl, swaggerSpec, options.AllowedTags)
+	return createToolToHandlers(apiURL, httpClient, swaggerSpec, options.AllowedTags)
+}
+
+func orgIDKeyFromContext(ctx context.Context) (string, bool) {
+	if orgID, ok := ctx.Value(tools.OrgIDKey).(string); ok {
+		return orgID, true
+	}
+	return "", false
 }

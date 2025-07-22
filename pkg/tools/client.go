@@ -75,22 +75,6 @@ func (c *HTTPClient) RoundTrip(req *http.Request) (*http.Response, error) {
 	return c.cl.Transport.RoundTrip(req)
 }
 
-func WithKeyword(keyword string) QueryParamOption {
-	return func(v url.Values) {
-		if keyword != "" {
-			v.Add("keyword", keyword)
-		}
-	}
-}
-
-func WithLimit(limit string) QueryParamOption {
-	return func(v url.Values) {
-		if limit != "" {
-			v.Add("limit", limit)
-		}
-	}
-}
-
 func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) ([]PipelineSummary, error) {
 	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
