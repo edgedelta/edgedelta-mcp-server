@@ -8,6 +8,7 @@ import (
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
+	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -32,7 +33,7 @@ type MCPHTTPServer struct {
 }
 
 // New creates a new Edge Delta MCP HTTP server
-func NewHTTPServer(opts ...ServerOption) (Server, error) {
+func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, error) {
 	// Set defaults
 	config := defaultServerConfig
 
@@ -43,9 +44,9 @@ func NewHTTPServer(opts ...ServerOption) (Server, error) {
 
 	httpClient := tools.NewHTTPClient(config.apiTokenHeader)
 
-	toolToHandlers, err := swagger2mcp.NewToolsFromURL(
-		config.openAPIDocURL,
+	toolToHandlers, err := swagger2mcp.NewToolsFromSpec(
 		config.apiURL,
+		spec,
 		httpClient,
 		swagger2mcp.WithAllowedTags(config.allowedTags),
 	)
@@ -96,4 +97,8 @@ func (m *MCPHTTPServer) Port() int {
 
 func SetTokenInContext(ctx context.Context, apiToken string) context.Context {
 	return context.WithValue(ctx, tools.APITokenKey, apiToken)
+}
+
+func (m *MCPHTTPServer) HTTPServer() *server.StreamableHTTPServer {
+	return m.httpServer
 }
