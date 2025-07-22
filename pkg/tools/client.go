@@ -282,10 +282,14 @@ func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]
 		return nil, fmt.Errorf("failed to fetch facets, status code %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var facets []Facet
-	if err := json.NewDecoder(resp.Body).Decode(&facets); err != nil {
+	var response FacetsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode facets response: %v", err)
 	}
+
+	facets := make([]Facet, 0, len(response.Builtin)+len(response.UserDefined))
+	facets = append(facets, response.Builtin...)
+	facets = append(facets, response.UserDefined...)
 
 	return facets, nil
 }
