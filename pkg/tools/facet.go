@@ -25,6 +25,11 @@ type FacetOption struct {
 	Count int    `json:"count,omitempty"`
 }
 
+type FacetsResponse struct {
+	Builtin     []Facet `json:"builtin"`
+	UserDefined []Facet `json:"userDefined"`
+}
+
 var FacetsTool = mcp.NewTool("facets",
 	mcp.WithDescription("Retrieves facets for the given scope. This can be used to filter search results."),
 	mcp.WithString("scope",
@@ -111,9 +116,9 @@ func FacetsResourceHandler(client Client) server.ResourceTemplateHandlerFunc {
 
 func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		facet, err := request.RequireString("facet")
+		facet, err := request.RequireString("facet_path")
 		if err != nil {
-			return mcp.NewToolResultError("missing required parameter: facet"), err
+			return mcp.NewToolResultError("missing required parameter: facet_path"), err
 		}
 		scope, err := request.RequireString("scope")
 		if err != nil {
