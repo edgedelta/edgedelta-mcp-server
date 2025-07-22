@@ -7,7 +7,7 @@ toolchain go1.23.8
 require (
 	github.com/go-openapi/spec v0.21.0
 	github.com/gorilla/mux v1.8.1
-	github.com/mark3labs/mcp-go v0.33.0
+	github.com/mark3labs/mcp-go v0.34.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 )
