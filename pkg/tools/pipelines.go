@@ -12,6 +12,10 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+const (
+	defaultLookbackDaysForGetPipelines = 7
+)
+
 func WithKeyword(keyword string) QueryParamOption {
 	return func(v url.Values) {
 		if keyword != "" {
@@ -50,7 +54,13 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			if err != nil {
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
 			}
-			result, err := GetPipelines(ctx, client, WithLimit(limit), WithKeyword(keyword))
+
+			lookbackDays, err := params.Optional[int](request, "lookbackDays")
+			if err != nil || lookbackDays == 0 {
+				lookbackDays = defaultLookbackDaysForGetPipelines
+			}
+
+			result, err := GetPipelines(ctx, client, lookbackDays, WithLimit(limit), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}
