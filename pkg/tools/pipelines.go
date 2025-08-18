@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
 
@@ -44,7 +45,7 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				mcp.Description("Keyword to filter pipelines if provided should be in the pipeline tag"),
 				mcp.DefaultString(""),
 			),
-			mcp.WithNumber("lookback_days",
+			mcp.WithString("lookback_days",
 				mcp.Description("Lookback days to get pipelines, default is 7"),
 				mcp.DefaultNumber(7),
 			),
@@ -59,12 +60,17 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
 			}
 
-			lookbackDays, err := params.Optional[int](request, "lookback_days")
-			if err != nil || lookbackDays == 0 {
-				lookbackDays = defaultLookbackDaysForGetPipelines
+			lookbackDays, err := params.Optional[string](request, "lookback_days")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get lookback_days, err: %w", err)
 			}
 
-			result, err := GetPipelines(ctx, client, lookbackDays, WithLimit(limit), WithKeyword(keyword))
+			lookbackDaysVal, ok := getNumber(lookbackDays)
+			if !ok {
+				lookbackDaysVal = defaultLookbackDaysForGetPipelines
+			}
+
+			result, err := GetPipelines(ctx, client, lookbackDaysVal, WithLimit(limit), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}
@@ -76,4 +82,11 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 
 			return mcp.NewToolResultText(string(r)), nil
 		}
+}
+
+func getNumber(s string) (int, bool) {
+	if i, err := strconv.Atoi(s); err == nil {
+		return i, true
+	}
+	return 0, false
 }

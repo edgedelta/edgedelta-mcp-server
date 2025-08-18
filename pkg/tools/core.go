@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	// URLTimeFormat is used to parse date time query parameters
-	URLTimeFormat = "2006-01-02T15:04:05.000Z"
+	// StorageTimeFormat is used to filter out pipelines that are not updated in the last lookback days
+	StorageTimeFormat = "2006-01-02 15:04:05.999999999 -0700 MST"
 )
 
 type QueryParamOption func(url.Values)

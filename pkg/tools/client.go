@@ -143,6 +143,7 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 		}
 	}
 
+	lookbackCutoff := time.Now().UTC().AddDate(0, 0, -lookbackDays)
 	returnPipelines := make([]PipelineSummary, 0)
 	for _, pipeline := range pipelines {
 		if forcedAdd[pipeline.ID] {
@@ -170,7 +171,8 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 		}
 
 		// filter out not updated in last lookbackDays days
-		if pipeline.Updated < time.Now().UTC().AddDate(0, 0, -lookbackDays).Format(URLTimeFormat) {
+		updatedTime, err := time.Parse(StorageTimeFormat, pipeline.Updated)
+		if err != nil || updatedTime.IsZero() || updatedTime.Before(lookbackCutoff) {
 			continue
 		}
 
