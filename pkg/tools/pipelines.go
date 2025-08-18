@@ -44,6 +44,10 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				mcp.Description("Keyword to filter pipelines if provided should be in the pipeline tag"),
 				mcp.DefaultString(""),
 			),
+			mcp.WithNumber("lookback_days",
+				mcp.Description("Lookback days to get pipelines, default is 7"),
+				mcp.DefaultNumber(7),
+			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			limit, err := params.Optional[string](request, "limit")
@@ -55,7 +59,7 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
 			}
 
-			lookbackDays, err := params.Optional[int](request, "lookbackDays")
+			lookbackDays, err := params.Optional[int](request, "lookback_days")
 			if err != nil || lookbackDays == 0 {
 				lookbackDays = defaultLookbackDaysForGetPipelines
 			}
