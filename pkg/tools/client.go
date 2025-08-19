@@ -88,7 +88,7 @@ func (c *HTTPClient) APIURL() string {
 	return c.apiURL
 }
 
-func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) ([]PipelineSummary, error) {
+func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...QueryParamOption) ([]PipelineSummary, error) {
 	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -143,6 +143,7 @@ func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) 
 		}
 	}
 
+	lookbackCutoff := time.Now().UTC().AddDate(0, 0, -lookbackDays)
 	returnPipelines := make([]PipelineSummary, 0)
 	for _, pipeline := range pipelines {
 		if forcedAdd[pipeline.ID] {
@@ -169,8 +170,9 @@ func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) 
 			continue
 		}
 
-		// filter out not updated in last 7 days
-		if pipeline.Updated < time.Now().UTC().AddDate(0, 0, -7).Format(URLTimeFormat) {
+		// filter out not updated in last lookbackDays days
+		updatedTime, err := time.Parse(StorageTimeFormat, pipeline.Updated)
+		if err != nil || updatedTime.IsZero() || updatedTime.Before(lookbackCutoff) {
 			continue
 		}
 
