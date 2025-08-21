@@ -1,4 +1,5 @@
 # Edge Delta MCP Server
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/edgedelta/edgedelta-mcp-server)](https://archestra.ai/mcp-catalog/edgedelta__edgedelta-mcp-server)
 
 The **Edge Delta MCP Server** is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
 server that provides seamless integration with Edge Delta APIs, enabling advanced
