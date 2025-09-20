@@ -56,6 +56,10 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 func AddCustomResources(s *server.MCPServer, client tools.Client) {
 	s.AddResourceTemplate(tools.FacetsResource, tools.FacetsResourceHandler(client))
 	s.AddResourceTemplate(tools.FacetOptionsResource, tools.FacetOptionsResourceHandler(client))
+	s.AddResource(tools.ServicesResource, tools.ServicesResourceHandler(client))
+	s.AddResource(tools.LogFacetKeysResource, tools.LogFacetKeysResourceHandler(client))
+	s.AddResource(tools.MetricFacetKeysResource, tools.MetricFacetKeysResourceHandler(client))
+	s.AddResource(tools.EventFacetKeysResource, tools.EventFacetKeysResourceHandler(client))
 }
 
 // serverConfig holds internal configuration
