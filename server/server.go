@@ -16,7 +16,7 @@ var (
 		apiURL:         "https://api.edgedelta.com",
 		serverName:     "edgedelta-mcp-server",
 		serverVersion:  "0.0.1",
-		allowedTags:    []string{"AI"},
+		allowedTags:    []string{"AI", "ServedByMCP"},
 		apiTokenHeader: "X-ED-API-Token",
 		logger:         slog.Default(),
 		// HTTP server options
