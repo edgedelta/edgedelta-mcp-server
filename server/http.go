@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/swagger2mcp"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
-	"github.com/go-openapi/spec"
 	"github.com/gorilla/mux"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -34,7 +32,7 @@ type MCPHTTPServer struct {
 }
 
 // New creates a new Edge Delta MCP HTTP server
-func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, error) {
+func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 	// Set defaults
 	config := defaultServerConfig
 
@@ -45,21 +43,7 @@ func NewHTTPServer(spec *spec.Swagger, opts ...ServerOption) (*MCPHTTPServer, er
 
 	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
-	toolToHandlers, err := swagger2mcp.NewToolsFromSpec(
-		config.apiURL,
-		spec,
-		httpClient,
-		swagger2mcp.WithAllowedTags(config.allowedTags),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tools from URL: %w", err)
-	}
-
 	s := server.NewMCPServer(config.serverName, config.serverVersion)
-
-	for _, toolToHandler := range toolToHandlers {
-		s.AddTool(toolToHandler.Tool, toolToHandler.Handler)
-	}
 
 	AddCustomTools(s, httpClient)
 	AddCustomResources(s, httpClient)

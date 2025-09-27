@@ -7,7 +7,6 @@ import (
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
-	"github.com/go-openapi/spec"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -16,7 +15,6 @@ var (
 		apiURL:         "https://api.edgedelta.com",
 		serverName:     "edgedelta-mcp-server",
 		serverVersion:  "0.0.1",
-		allowedTags:    []string{"AI", "ServedByMCP"},
 		apiTokenHeader: "X-ED-API-Token",
 		logger:         slog.Default(),
 		// HTTP server options
@@ -36,12 +34,12 @@ const (
 	HTTPServerType  ServerType = "http"
 )
 
-func CreateServer(serverType ServerType, orgID, apiToken string, spec *spec.Swagger, opts ...ServerOption) (Server, error) {
+func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerOption) (Server, error) {
 	switch serverType {
 	case StdinServerType:
-		return NewStdioServer(orgID, apiToken, spec, opts...)
+		return NewStdioServer(orgID, apiToken, opts...)
 	case HTTPServerType:
-		return NewHTTPServer(spec, opts...)
+		return NewHTTPServer(opts...)
 	default:
 		return nil, fmt.Errorf("invalid server type: %s", serverType)
 	}
@@ -49,8 +47,16 @@ func CreateServer(serverType ServerType, orgID, apiToken string, spec *spec.Swag
 
 func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.GetPipelinesTool(client))
+	s.AddTool(tools.GetPipelineHistoryTool(client))
+	s.AddTool(tools.DeployPipelineTool(client))
+	s.AddTool(tools.AddPipelineSourceTool(client))
 	s.AddTool(tools.FacetsTool, tools.FacetsToolHandler(client))
 	s.AddTool(tools.FacetOptionsTool, tools.FacetOptionsToolHandler(client))
+	s.AddTool(tools.GetLogSearchTool(client))
+	s.AddTool(tools.GetEventSearchTool(client))
+	s.AddTool(tools.GetLogPatternsTool(client))
+	s.AddTool(tools.GetAllDashboardsTool(client))
+	s.AddTool(tools.GetDashboardTool(client))
 }
 
 func AddCustomResources(s *server.MCPServer, client tools.Client) {
@@ -67,7 +73,6 @@ type serverConfig struct {
 	apiURL         string
 	serverName     string
 	serverVersion  string
-	allowedTags    []string
 	apiTokenHeader string
 	logger         *slog.Logger
 
@@ -97,13 +102,6 @@ func WithServerName(name string) ServerOption {
 func WithServerVersion(version string) ServerOption {
 	return func(c *serverConfig) {
 		c.serverVersion = version
-	}
-}
-
-// WithAllowedTags sets the allowed tags for filtering
-func WithAllowedTags(tags []string) ServerOption {
-	return func(c *serverConfig) {
-		c.allowedTags = tags
 	}
 }
 
