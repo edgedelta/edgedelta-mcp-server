@@ -2,26 +2,17 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"strconv"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 	"github.com/edgedelta/edgedelta-mcp-server/server"
 
-	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	stdlog "log"
-)
-
-const (
-	openAPIDocURL = "https://api.edgedelta.com/swagger/doc.json"
 )
 
 var (
@@ -133,12 +124,7 @@ func runServer(cfg runConfig) error {
 	apiToken := os.Getenv("ED_API_TOKEN")
 	orgID := os.Getenv("ED_ORG_ID")
 
-	spec, err := fetchOpenAPISpec()
-	if err != nil {
-		return fmt.Errorf("failed to fetch openapi spec, err: %w", err)
-	}
-
-	mcpServer, err := server.CreateServer(cfg.serverType, orgID, apiToken, spec, opts...)
+	mcpServer, err := server.CreateServer(cfg.serverType, orgID, apiToken, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create server, err: %w", err)
 	}
@@ -157,36 +143,4 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-}
-
-func fetchOpenAPISpec() (*spec.Swagger, error) {
-	cl := tools.NewHTTPClient("", "")
-
-	resp, err := cl.Get(openAPIDocURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch openapi spec, err: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected response status code: %d when fetching openapi spec", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body, err: %w", err)
-	}
-
-	swaggerSpec := &spec.Swagger{}
-	if err := json.Unmarshal(data, swaggerSpec); err != nil {
-		return nil, fmt.Errorf("failed to parse swagger json, err: %w", err)
-	}
-
-	if err := spec.ExpandSpec(swaggerSpec, &spec.ExpandOptions{
-		RelativeBase: "",
-	}); err != nil {
-		return nil, fmt.Errorf("failed to expand spec, err: %w", err)
-	}
-
-	return swaggerSpec, nil
 }
