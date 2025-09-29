@@ -74,7 +74,7 @@ service.name:("api" OR "web")`),
 			if to, _ := params.Optional[string](request, "to"); to != "" {
 				queryParams.Add("to", to)
 			}
-			if limit, _ := params.Optional[int](request, "limit"); limit > 0 {
+			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%v", limit))
 			}
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
