@@ -76,6 +76,10 @@ service.name:("api" OR "web")`),
 			}
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%v", limit))
+			} else {
+				// add always default limit if not provided
+				queryParams.Add("limit", "20")
+
 			}
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
 				queryParams.Add("cursor", cursor)
@@ -182,6 +186,9 @@ service.name:("api" OR "web")`),
 			}
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
+			} else {
+				// add always default limit if not provided
+				queryParams.Add("limit", "20")
 			}
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
 				queryParams.Add("cursor", cursor)
@@ -290,6 +297,9 @@ service.name:("api" OR "web")`),
 			}
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
+			} else {
+				// add always default limit if not provided
+				queryParams.Add("limit", "20")
 			}
 			if offset, _ := params.Optional[string](request, "offset"); offset != "" {
 				queryParams.Add("offset", offset)
