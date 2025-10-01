@@ -79,8 +79,8 @@ service.name:("api" OR "web")`),
 			} else {
 				// add always default limit if not provided
 				queryParams.Add("limit", "20")
-
 			}
+
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
 				queryParams.Add("cursor", cursor)
 			}
