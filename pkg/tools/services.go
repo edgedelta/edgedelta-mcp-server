@@ -66,7 +66,6 @@ func GetServices(ctx context.Context, client Client, opts ...QueryParamOption) (
 	}
 
 	graphURL.RawQuery = queryParams.Encode()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, graphURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create services request: %v", err)
@@ -79,8 +78,8 @@ func GetServices(ctx context.Context, client Client, opts ...QueryParamOption) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch services, status code %d", resp.StatusCode)
 	}

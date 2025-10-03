@@ -37,6 +37,10 @@ var FacetsTool = mcp.NewTool("facets",
 		mcp.Required(),
 		mcp.Enum("log", "metric", "trace"),
 	),
+	mcp.WithReadOnlyHintAnnotation(true),
+	mcp.WithIdempotentHintAnnotation(false),
+	mcp.WithDestructiveHintAnnotation(false),
+	mcp.WithOpenWorldHintAnnotation(false),
 )
 
 var FacetsResource = mcp.NewResourceTemplate(
@@ -61,6 +65,10 @@ var FacetOptionsTool = mcp.NewTool("facet_options",
 		mcp.Description("The maximum number of facet options to return. Default is 100."),
 		mcp.DefaultString("100"),
 	),
+	mcp.WithReadOnlyHintAnnotation(true),
+	mcp.WithIdempotentHintAnnotation(false),
+	mcp.WithDestructiveHintAnnotation(false),
+	mcp.WithOpenWorldHintAnnotation(false),
 )
 
 var FacetOptionsResource = mcp.NewResourceTemplate(
@@ -81,6 +89,7 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get facets, err: %w", err)
 		}
+
 		r, err := json.Marshal(result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
@@ -96,10 +105,12 @@ func FacetsResourceHandler(client Client) server.ResourceTemplateHandlerFunc {
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract scope from URI: %w", err)
 		}
+
 		result, err := GetFacets(ctx, client, WithScope(scope))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get facets, err: %w", err)
 		}
+
 		r, err := json.Marshal(result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
@@ -120,10 +131,12 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 		if err != nil {
 			return mcp.NewToolResultError("missing required parameter: facet_path"), err
 		}
+
 		scope, err := request.RequireString("scope")
 		if err != nil {
 			return mcp.NewToolResultError("missing required parameter: scope"), err
 		}
+
 		limit, err := params.Optional[string](request, "limit")
 		if err != nil {
 			return mcp.NewToolResultError("invalid parameter: limit"), err
@@ -133,6 +146,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get facet options, err: %w", err)
 		}
+
 		r, err := json.Marshal(result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)

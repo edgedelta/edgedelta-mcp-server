@@ -19,6 +19,10 @@ func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			mcp.WithBoolean("include_definitions",
 				mcp.Description("Include definitions in the response"),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -35,8 +39,8 @@ func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			if includeDefinitions, _ := params.Optional[bool](request, "include_definitions"); includeDefinitions {
 				queryParams.Add("include_definitions", "true")
 			}
-			dashboardsURL.RawQuery = queryParams.Encode()
 
+			dashboardsURL.RawQuery = queryParams.Encode()
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, dashboardsURL.String(), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -49,8 +53,8 @@ func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
@@ -72,6 +76,10 @@ func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				mcp.Description("Dashboard ID"),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -85,7 +93,6 @@ func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			}
 
 			dashboardURL := fmt.Sprintf("%s/v1/orgs/%s/dashboards/%s", client.APIURL(), orgID, dashboardID)
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, dashboardURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -98,8 +105,8 @@ func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)

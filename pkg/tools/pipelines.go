@@ -52,12 +52,17 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				mcp.Description("Lookback days to get pipelines, default is 7"),
 				mcp.DefaultNumber(7),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			limit, err := params.Optional[string](request, "limit")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get limit, err: %w", err)
 			}
+
 			keyword, err := params.Optional[string](request, "keyword")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
@@ -102,6 +107,10 @@ func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHa
 				mcp.Description("Config ID of the pipeline"),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -115,7 +124,6 @@ func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHa
 			}
 
 			historyURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/history", client.APIURL(), orgID, confID)
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -128,8 +136,8 @@ func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHa
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
@@ -155,6 +163,10 @@ func DeployPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 				mcp.Description("Version use lastUpdated field from pipeline in milliseconds timestamp format. Example: 1752190141312. This is the timestamp field of the most recent element in the result of pipeline history. So, pipeline_history should be called before this tool to get the latest version of the pipeline."),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -173,7 +185,6 @@ func DeployPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 			}
 
 			deployURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/deploy/%s", client.APIURL(), orgID, confID, version)
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, deployURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -186,8 +197,8 @@ func DeployPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
@@ -258,6 +269,10 @@ Example node configurations:
 				mcp.Description("Source node configuration to add. Must include 'name' and 'type' fields. Type can be 'file_input', 'kubernetes_input', or 'demo_input'. See examples in the tool description for specific field requirements for each node type."),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -292,7 +307,6 @@ Example node configurations:
 			}
 
 			addSourceURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/add_source", client.APIURL(), orgID, confID)
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, addSourceURL, bytes.NewReader(payloadBytes))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -305,8 +319,8 @@ Example node configurations:
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
