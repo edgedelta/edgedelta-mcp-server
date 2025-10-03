@@ -61,7 +61,6 @@ func GetFacetKeys(ctx context.Context, client Client, scope string, opts ...Quer
 	}
 
 	facetKeysURL.RawQuery = queryParams.Encode()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, facetKeysURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create facet keys request: %v", err)
@@ -74,8 +73,8 @@ func GetFacetKeys(ctx context.Context, client Client, scope string, opts ...Quer
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch facet keys, status code %d", resp.StatusCode)
 	}

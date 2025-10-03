@@ -59,6 +59,7 @@ func (t *authedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if token, ok := tokenKeyFromContext(req.Context()); ok {
 		req.Header.Set(t.apiTokenHeader, token)
 	}
+
 	return t.Transport.RoundTrip(req)
 }
 
@@ -103,12 +104,13 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pipelines request, err: %v", err)
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch payload from url: %s, status code %d", req.URL.RequestURI(), resp.StatusCode)
 	}
@@ -127,6 +129,7 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 	for _, opt := range opts {
 		opt(queryValues)
 	}
+
 	keyword := queryValues.Get("keyword")
 	limitStr := queryValues.Get("limit")
 	limit, err := strconv.Atoi(limitStr)
@@ -242,8 +245,8 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to save pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
@@ -277,8 +280,8 @@ func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to fetch facets, status code %d: %s", resp.StatusCode, string(bodyBytes))
@@ -316,8 +319,8 @@ func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOptio
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("failed to fetch facet options, status code %d: %s", resp.StatusCode, string(bodyBytes))
@@ -352,11 +355,11 @@ func createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...Q
 	}
 
 	reqUrl.RawQuery = queryValues.Encode()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String(), nil)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-ED-API-Token", token)
 	return req, nil

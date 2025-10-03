@@ -47,6 +47,10 @@ service.name:("api" OR "web")`),
 				mcp.Description("Order of the logs in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
 				mcp.DefaultString("desc"),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -61,19 +65,22 @@ service.name:("api" OR "web")`),
 			}
 
 			queryParams := searchURL.Query()
-
 			if query, _ := params.Optional[string](request, "query"); query != "" {
 				queryParams.Add("query", query)
 			}
+
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
+
 			if from, _ := params.Optional[string](request, "from"); from != "" {
 				queryParams.Add("from", from)
 			}
+
 			if to, _ := params.Optional[string](request, "to"); to != "" {
 				queryParams.Add("to", to)
 			}
+
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%v", limit))
 			} else {
@@ -84,12 +91,12 @@ service.name:("api" OR "web")`),
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
 				queryParams.Add("cursor", cursor)
 			}
+
 			if order, _ := params.Optional[string](request, "order"); order != "" {
 				queryParams.Add("order", order)
 			}
 
 			searchURL.RawQuery = queryParams.Encode()
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL.String(), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -102,8 +109,8 @@ service.name:("api" OR "web")`),
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
@@ -157,6 +164,10 @@ service.name:("api" OR "web")`),
 				mcp.Description("Order of the events in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
 				mcp.DefaultString("desc"),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -171,34 +182,38 @@ service.name:("api" OR "web")`),
 			}
 
 			queryParams := eventsURL.Query()
-
 			if query, _ := params.Optional[string](request, "query"); query != "" {
 				queryParams.Add("query", query)
 			}
+
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
+
 			if from, _ := params.Optional[string](request, "from"); from != "" {
 				queryParams.Add("from", from)
 			}
+
 			if to, _ := params.Optional[string](request, "to"); to != "" {
 				queryParams.Add("to", to)
 			}
+
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
 			} else {
 				// add always default limit if not provided
 				queryParams.Add("limit", "20")
 			}
+
 			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
 				queryParams.Add("cursor", cursor)
 			}
+
 			if order, _ := params.Optional[string](request, "order"); order != "" {
 				queryParams.Add("order", order)
 			}
 
 			eventsURL.RawQuery = queryParams.Encode()
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, eventsURL.String(), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -211,8 +226,8 @@ service.name:("api" OR "web")`),
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)
@@ -265,6 +280,10 @@ service.name:("api" OR "web")`),
 			mcp.WithBoolean("negative",
 				mcp.Description("Negative param is used to get negative sentiments."),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			orgID, token, err := FetchContextKeys(ctx)
@@ -279,28 +298,33 @@ service.name:("api" OR "web")`),
 			}
 
 			queryParams := statsURL.Query()
-
 			if query, _ := params.Optional[string](request, "query"); query != "" {
 				queryParams.Add("query", query)
 			}
+
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
+
 			if from, _ := params.Optional[string](request, "from"); from != "" {
 				queryParams.Add("from", from)
 			}
+
 			if to, _ := params.Optional[string](request, "to"); to != "" {
 				queryParams.Add("to", to)
 			}
+
 			if summary, _ := params.Optional[bool](request, "summary"); summary {
 				queryParams.Add("summary", "true")
 			}
+
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
 			} else {
 				// add always default limit if not provided
 				queryParams.Add("limit", "20")
 			}
+
 			if offset, _ := params.Optional[string](request, "offset"); offset != "" {
 				queryParams.Add("offset", offset)
 			}
@@ -309,7 +333,6 @@ service.name:("api" OR "web")`),
 			}
 
 			statsURL.RawQuery = queryParams.Encode()
-
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, statsURL.String(), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
@@ -322,8 +345,8 @@ service.name:("api" OR "web")`),
 			if err != nil {
 				return nil, err
 			}
-			defer resp.Body.Close()
 
+			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read response body: %v", err)

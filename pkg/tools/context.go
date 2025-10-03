@@ -19,9 +19,11 @@ func FetchContextKeys(ctx context.Context) (string, string, error) {
 	if !ok {
 		return "", "", fmt.Errorf("orgID not found in context")
 	}
+
 	token, ok := ctx.Value(TokenKey).(string)
 	if !ok {
 		return "", "", fmt.Errorf("token not found in context")
 	}
+
 	return orgID, token, nil
 }
