@@ -53,6 +53,7 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.FacetsTool, tools.FacetsToolHandler(client))
 	s.AddTool(tools.FacetOptionsTool, tools.FacetOptionsToolHandler(client))
 	s.AddTool(tools.GetLogSearchTool(client))
+	s.AddTool(tools.GetMetricSearchTool(client))
 	s.AddTool(tools.GetEventSearchTool(client))
 	s.AddTool(tools.GetLogPatternsTool(client))
 	s.AddTool(tools.GetAllDashboardsTool(client))
