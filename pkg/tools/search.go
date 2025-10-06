@@ -145,15 +145,15 @@ func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandl
 service.name:"ingestor"
 ed.tag:"prod" AND -host.name:"server1.mydomain.com"
 service.name:("api" OR "web")
-Default is "*" to include all metrics.`),
+Default is "*" to include all metrics`),
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys that will be used during the metric search. One can refer "facet-keys://metrics" resource for available keys.`),
+				mcp.Description(`Grouping keys that will be used during the metric search. One can refer "facet-keys://metrics" resource for available keys`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
-				mcp.Description("By default, rollup period will be handled according to the lookup period. However, one can specify it according to its own needs. This needs to be defined in seconds."),
+				mcp.Description("By default, rollup period will be handled according to the lookup period. However, one can specify it according to its own needs. This needs to be defined in seconds"),
 			),
 			mcp.WithString("lookback",
 				mcp.Description("Lookback period in GOLANG duration format. e.g. (1h, 15m, 24h). Either provide from/to or just lookback"),
@@ -168,11 +168,15 @@ Default is "*" to include all metrics.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithNumber("limit",
-				mcp.Description("Limits the number of metrics in the response."),
+				mcp.Description("Limits the number of metrics in the response"),
 			),
 			mcp.WithString("order",
 				mcp.Description("Order of the metrics in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
 				mcp.DefaultString("desc"),
+			),
+			mcp.WithString("graph_type",
+				mcp.Description(`Graph type of the query, valid options are "timeseries" and "table". Default is "timeseries"`),
+				mcp.DefaultString("timeseries"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(false),
@@ -237,7 +241,7 @@ Default is "*" to include all metrics.`),
 					},
 				},
 				"formulas": map[string]any{
-					"response": map[string]string{
+					"A": map[string]string{
 						"formula": "A",
 					},
 				},
@@ -274,6 +278,10 @@ Default is "*" to include all metrics.`),
 
 			if order, _ := params.Optional[string](request, "order"); order != "" {
 				queryParams.Add("order", order)
+			}
+
+			if graphType, _ := params.Optional[string](request, "graph_type"); graphType != "" {
+				queryParams.Add("graph_type", graphType)
 			}
 
 			searchURL.RawQuery = queryParams.Encode()
