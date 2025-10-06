@@ -58,6 +58,10 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.GetLogPatternsTool(client))
 	s.AddTool(tools.GetAllDashboardsTool(client))
 	s.AddTool(tools.GetDashboardTool(client))
+	s.AddTool(tools.GetLogGraphTool(client))
+	s.AddTool(tools.GetMetricGraphTool(client))
+	s.AddTool(tools.GetTraceGraphTool(client))
+	s.AddTool(tools.GetPatternGraphTool(client))
 }
 
 func AddCustomResources(s *server.MCPServer, client tools.Client) {
@@ -66,6 +70,8 @@ func AddCustomResources(s *server.MCPServer, client tools.Client) {
 	s.AddResource(tools.ServicesResource, tools.ServicesResourceHandler(client))
 	s.AddResource(tools.LogFacetKeysResource, tools.LogFacetKeysResourceHandler(client))
 	s.AddResource(tools.MetricFacetKeysResource, tools.MetricFacetKeysResourceHandler(client))
+	s.AddResource(tools.TraceFacetKeysResource, tools.TraceFacetKeysResourceHandler(client))
+	s.AddResource(tools.PatternFacetKeysResource, tools.PatternFacetKeysResourceHandler(client))
 	s.AddResource(tools.EventFacetKeysResource, tools.EventFacetKeysResourceHandler(client))
 }
 

@@ -15,16 +15,18 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// GetLogSearchTool creates a tool to search logs
-func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("get_log_search",
-			mcp.WithDescription(`Search logs`),
+// GetLogGraphTool creates a tool to render a graph from logs
+func GetLogGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_log_graph",
+			mcp.WithDescription(`Render a graph from logs`),
 			mcp.WithString("query",
-				mcp.Description(`Log facets are to target the search. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://logs" resource. Examples;
+				mcp.Description(`Log facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://logs" resource. Examples;
 service.name:"ingestor"
 ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")`),
-				mcp.DefaultString(""),
+service.name:("api" OR "web")
+Default is "*" to include all logs`),
+				mcp.DefaultString("*"),
+				mcp.Required(),
 			),
 			mcp.WithString("lookback",
 				mcp.Description("Lookback period in GOLANG duration format. e.g. (1h, 15m, 24h). Either provide from/to or just lookback"),
@@ -39,12 +41,7 @@ service.name:("api" OR "web")`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithNumber("limit",
-				mcp.Description("Limits the number of logs in the response. Default is 20 for AI search, max is 1000. Can be negative to move cursor in prev direction."),
-				mcp.DefaultNumber(20),
-			),
-			mcp.WithString("cursor",
-				mcp.Description("Cursor provided from previous response, pass it to next request to move the cursor with given limit."),
-				mcp.DefaultString(""),
+				mcp.Description("Limits the number of logs in the response"),
 			),
 			mcp.WithString("order",
 				mcp.Description("Order of the logs in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
@@ -62,16 +59,38 @@ service.name:("api" OR "web")`),
 			}
 
 			// Build query parameters
-			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/search", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
 			if err != nil {
 				return nil, err
 			}
 
-			queryParams := searchURL.Query()
-			if query, _ := params.Optional[string](request, "query"); query != "" {
-				queryParams.Add("query", query)
+			var query string
+			if q, _ := params.Optional[string](request, "query"); q != "" {
+				query = q
+			} else {
+				return nil, fmt.Errorf(`"query" is required`)
 			}
 
+			payload := map[string]any{
+				"queries": map[string]any{
+					"Q1": map[string]any{
+						"scope": "log",
+						"query": query,
+					},
+				},
+				"formulas": map[string]any{
+					"R1": map[string]any{
+						"formula": "Q1",
+					},
+				},
+			}
+
+			buffer := bytes.NewBuffer(nil)
+			if err := json.NewEncoder(buffer).Encode(payload); err != nil {
+				return nil, fmt.Errorf("failed to encode request body: %w", err)
+			}
+
+			queryParams := searchURL.Query()
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
@@ -84,15 +103,8 @@ service.name:("api" OR "web")`),
 				queryParams.Add("to", to)
 			}
 
-			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
-				queryParams.Add("limit", fmt.Sprintf("%v", limit))
-			} else {
-				// add always default limit if not provided
-				queryParams.Add("limit", "20")
-			}
-
-			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
-				queryParams.Add("cursor", cursor)
+			if limit := request.GetInt("limit", 0); limit > 0 {
+				queryParams.Add("limit", fmt.Sprintf("%d", limit))
 			}
 
 			if order, _ := params.Optional[string](request, "order"); order != "" {
@@ -100,7 +112,7 @@ service.name:("api" OR "web")`),
 			}
 
 			searchURL.RawQuery = queryParams.Encode()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, searchURL.String(), nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL.String(), buffer)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
@@ -119,7 +131,7 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to read response body: %v", err)
 			}
 
-			if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode != http.StatusMultiStatus {
 				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
@@ -127,12 +139,12 @@ service.name:("api" OR "web")`),
 		}
 }
 
-// GetMetricSearchTool creates a tool to search metrics
-func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("get_metric_search",
-			mcp.WithDescription(`Search Metrics`),
+// GetMetricGraphTool creates a tool to render a graph from metrics
+func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_metric_graph",
+			mcp.WithDescription(`Render a graph from metrics`),
 			mcp.WithString("metric_name",
-				mcp.Description(`Metric name that will be searched for`),
+				mcp.Description(`Metric name that will be used for constructing the graph`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
@@ -141,7 +153,7 @@ func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandl
 				mcp.Required(),
 			),
 			mcp.WithString("filter_query",
-				mcp.Description(`Metric facets are to target the search. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://metrics" resource. Examples;
+				mcp.Description(`Metric facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://metrics" resource. Examples;
 service.name:"ingestor"
 ed.tag:"prod" AND -host.name:"server1.mydomain.com"
 service.name:("api" OR "web")
@@ -149,7 +161,7 @@ Default is "*" to include all metrics`),
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys that will be used during the metric search. One can refer "facet-keys://metrics" resource for available keys`),
+				mcp.Description(`Grouping keys that will be used for constructing the graph. One can refer "facet-keys://metrics" resource for available keys`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
@@ -173,10 +185,6 @@ Default is "*" to include all metrics`),
 			mcp.WithString("order",
 				mcp.Description("Order of the metrics in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
 				mcp.DefaultString("desc"),
-			),
-			mcp.WithString("graph_type",
-				mcp.Description(`Graph type of the query, valid options are "timeseries" and "table". Default is "timeseries"`),
-				mcp.DefaultString("timeseries"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(false),
@@ -235,14 +243,14 @@ Default is "*" to include all metrics`),
 
 			payload := map[string]any{
 				"queries": map[string]any{
-					"A": map[string]any{
+					"Q1": map[string]any{
 						"scope": "metric",
 						"query": cql,
 					},
 				},
 				"formulas": map[string]any{
-					"A": map[string]any{
-						"formula": "A",
+					"R1": map[string]any{
+						"formula": "Q1",
 					},
 				},
 			}
@@ -253,6 +261,7 @@ Default is "*" to include all metrics`),
 			}
 
 			queryParams := searchURL.Query()
+			queryParams.Add("graph_type", "timeseries")
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
@@ -265,16 +274,12 @@ Default is "*" to include all metrics`),
 				queryParams.Add("to", to)
 			}
 
-			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
-				queryParams.Add("limit", fmt.Sprintf("%v", limit))
+			if limit := request.GetInt("limit", 0); limit > 0 {
+				queryParams.Add("limit", fmt.Sprintf("%d", limit))
 			}
 
 			if order, _ := params.Optional[string](request, "order"); order != "" {
 				queryParams.Add("order", order)
-			}
-
-			if graphType, _ := params.Optional[string](request, "graph_type"); graphType != "" {
-				queryParams.Add("graph_type", graphType)
 			}
 
 			searchURL.RawQuery = queryParams.Encode()
@@ -305,24 +310,30 @@ Default is "*" to include all metrics`),
 		}
 }
 
-// GetEventSearchTool creates a tool to search events
-func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("get_event_search",
-			mcp.WithDescription("Search query using Edge Delta events search syntax, for anomaly search query should include event.type:pattern_anomaly"),
+// GetTraceGraphTool creates a tool to render a graph from traces
+func GetTraceGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_trace_graph",
+			mcp.WithDescription(`Render a graph from traces`),
 			mcp.WithString("query",
-				mcp.Description(`Log facets are for targeting the search, service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services.
-Keys are anded together and values in the keys are ORed. Examples;
-event.type:"pattern_anomaly" // all pattern anomalies
-event.domain:"Monitor Alerts" // all monitor events including logs, metrics, patterns
-event.domain:"K8s" // all kubernetes events
-service.name:"ingestor" AND event.type:pattern_anomaly" // all anomalies in ingestor service
-event.type:"metric_threshold" // all metric threshold exceeding monitor events
-event.type:"log_threshold" // all log threshold exceeding monitor events
-service.name:("api" OR "web")`),
-				mcp.DefaultString(""),
+				mcp.Description(`Trace facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://traces" resource. Examples;
+service.name:"ingestor"
+ed.tag:"prod" AND -host.name:"server1.mydomain.com"
+service.name:("api" OR "web")
+Default is "*" to include all traces`),
+				mcp.DefaultString("*"),
+				mcp.Required(),
+			),
+			mcp.WithString("data_type",
+				mcp.Description(`Data type that will be used for value of traces. "request" (for request count) and "latency" (for P50 and P95 values of percentiles) are the valid options`),
+				mcp.DefaultString("request"),
+				mcp.Required(),
+			),
+			mcp.WithBoolean("include_child_spans",
+				mcp.Description(`Whether to include or not child spans while returning the values. Should be set to true if include behavior is desired`),
+				mcp.DefaultBool(false),
 			),
 			mcp.WithString("lookback",
-				mcp.Description("Lookback period in golang duration format. e.g. '1h'. Either provide from/to or provide lookback/to or just lookback"),
+				mcp.Description("Lookback period in GOLANG duration format. e.g. (1h, 15m, 24h). Either provide from/to or just lookback"),
 				mcp.DefaultString("1h"),
 			),
 			mcp.WithString("from",
@@ -334,15 +345,10 @@ service.name:("api" OR "web")`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithNumber("limit",
-				mcp.Description("Limits the number of events in the response. Default is 20 for AI search, max is 1000. Can be negative to move cursor in prev direction."),
-				mcp.DefaultNumber(20),
-			),
-			mcp.WithString("cursor",
-				mcp.Description("Cursor provided from previous response, pass it to next request to move the cursor with given limit."),
-				mcp.DefaultString(""),
+				mcp.Description("Limits the number of traces in the response"),
 			),
 			mcp.WithString("order",
-				mcp.Description("Order of the events in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
+				mcp.Description("Order of the traces in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -357,16 +363,51 @@ service.name:("api" OR "web")`),
 			}
 
 			// Build query parameters
-			eventsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/events/search", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
 			if err != nil {
 				return nil, err
 			}
 
-			queryParams := eventsURL.Query()
-			if query, _ := params.Optional[string](request, "query"); query != "" {
-				queryParams.Add("query", query)
+			var query, dataType string
+			var includeChildSpans bool
+			if q, _ := params.Optional[string](request, "query"); q != "" {
+				query = q
+			} else {
+				return nil, fmt.Errorf(`"query" is required`)
 			}
 
+			if dType, _ := params.Optional[string](request, "data_type"); dType != "" {
+				dataType = dType
+			} else {
+				dataType = "request"
+			}
+
+			if incChildSpans, _ := params.Optional[bool](request, "include_child_spans"); incChildSpans {
+				includeChildSpans = true
+			}
+
+			payload := map[string]any{
+				"queries": map[string]any{
+					"Q1": map[string]any{
+						"scope":             "trace",
+						"query":             query,
+						"dataType":          dataType,
+						"includeChildSpans": includeChildSpans,
+					},
+				},
+				"formulas": map[string]any{
+					"R1": map[string]string{
+						"formula": "Q1",
+					},
+				},
+			}
+
+			buffer := bytes.NewBuffer(nil)
+			if err := json.NewEncoder(buffer).Encode(payload); err != nil {
+				return nil, fmt.Errorf("failed to encode request body: %w", err)
+			}
+
+			queryParams := searchURL.Query()
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
@@ -379,23 +420,16 @@ service.name:("api" OR "web")`),
 				queryParams.Add("to", to)
 			}
 
-			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
-				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
-			} else {
-				// add always default limit if not provided
-				queryParams.Add("limit", "20")
-			}
-
-			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
-				queryParams.Add("cursor", cursor)
+			if limit := request.GetInt("limit", 0); limit > 0 {
+				queryParams.Add("limit", fmt.Sprintf("%d", limit))
 			}
 
 			if order, _ := params.Optional[string](request, "order"); order != "" {
 				queryParams.Add("order", order)
 			}
 
-			eventsURL.RawQuery = queryParams.Encode()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, eventsURL.String(), nil)
+			searchURL.RawQuery = queryParams.Encode()
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL.String(), buffer)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
@@ -414,29 +448,49 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to read response body: %v", err)
 			}
 
-			if resp.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("failed to search events, status code %d: %s", resp.StatusCode, string(bodyBytes))
+			if resp.StatusCode != http.StatusMultiStatus {
+				return nil, fmt.Errorf("failed to graph traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
 			return mcp.NewToolResultText(string(bodyBytes)), nil
 		}
 }
 
-// GetLogPatternsTool creates a tool to get pattern stats
-func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("get_log_patterns",
-			mcp.WithDescription("Returns top log patterns (signatures of log messages) and their stats; count, proportion, sentiment and delta. If you want to get negative sentiments, you must set negative to true."),
+// GetPatternGraphTool creates a tool to render a graph from patterns
+func GetPatternGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_pattern_graph",
+			mcp.WithDescription(`Render a graph from patterns`),
 			mcp.WithString("query",
-				mcp.Description(`Pattern facets are for targeting the search.
-service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services.
-Keys are anded together and values in the keys are ORed. Examples;
+				mcp.Description(`Pattern facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://patterns" resource. Examples;
 service.name:"ingestor"
 ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")`),
-				mcp.DefaultString(""),
+service.name:("api" OR "web")
+Default is "*" to include all patterns`),
+				mcp.DefaultString("*"),
+				mcp.Required(),
+			),
+			mcp.WithBoolean("omit_zero_patterns",
+				mcp.Description(`Whether to omit patterns with zero samples or not`),
+				mcp.DefaultBool(false),
+			),
+			mcp.WithBoolean("include_negative_patterns",
+				mcp.Description(`Whether to include patterns with negative sentiment value or not`),
+				mcp.DefaultBool(false),
+			),
+			mcp.WithBoolean("include_missing_under_other",
+				mcp.Description(`Whether to include missing values under "Other" or not`),
+				mcp.DefaultBool(false),
+			),
+			mcp.WithString("volatility",
+				mcp.Description(`Volatility filter for patterns. "all" (no filtering), "new" (new patterns according to volatility offset), "existing" (pre-existing patterns according to volatility offset) and "gone" (gone patterns according to volatility offset) are the valid options`),
+				mcp.DefaultString("all"),
+			),
+			mcp.WithString("volatility_offset",
+				mcp.Description(`Offset to be used by volatility parameter. Should be in GOLANG duration format. e.g. (1h, 15m, 24h)`),
+				mcp.DefaultString("24h"),
 			),
 			mcp.WithString("lookback",
-				mcp.Description("Lookback period in golang duration format. e.g. '1h'. Either provide from/to or provide lookback/to or just lookback"),
+				mcp.Description("Lookback period in GOLANG duration format. e.g. (1h, 15m, 24h). Either provide from/to or just lookback"),
 				mcp.DefaultString("1h"),
 			),
 			mcp.WithString("from",
@@ -447,19 +501,12 @@ service.name:("api" OR "web")`),
 				mcp.Description("To datetime in ISO format 2006-01-02T15:04:05.000Z"),
 				mcp.DefaultString(""),
 			),
-			mcp.WithBoolean("summary",
-				mcp.Description("If summary true call returns up to 50 interesting clusters with 10 top anomaly, top/bottom delta, top/bottom count. Param size is ignored"),
-			),
 			mcp.WithNumber("limit",
-				mcp.Description("Max number of clusters in response. For AI search, limit should be 20."),
-				mcp.DefaultNumber(20),
+				mcp.Description("Limits the number of patterns in the response"),
 			),
-			mcp.WithString("offset",
-				mcp.Description("Comma separated offsets for delta stat calculation. Each offset is in golang duration format. Default value is lookback duration. e.g. '24h'."),
-				mcp.DefaultString(""),
-			),
-			mcp.WithBoolean("negative",
-				mcp.Description("Negative param is used to get negative sentiments."),
+			mcp.WithString("order",
+				mcp.Description("Order of the patterns in the response, either 'ASC', 'asc', 'DESC' or 'desc'"),
+				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(false),
@@ -473,16 +520,68 @@ service.name:("api" OR "web")`),
 			}
 
 			// Build query parameters
-			statsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/clustering/stats", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
 			if err != nil {
 				return nil, err
 			}
 
-			queryParams := statsURL.Query()
-			if query, _ := params.Optional[string](request, "query"); query != "" {
-				queryParams.Add("query", query)
+			var query, volatility, volatilityOffset string
+			var omitZeroPatterns, includeNegativePatterns, includeMissingUnderOther bool
+			if q, _ := params.Optional[string](request, "query"); q != "" {
+				query = q
+			} else {
+				return nil, fmt.Errorf(`"query" is required`)
 			}
 
+			if omitZero, _ := params.Optional[bool](request, "omit_zero_patterns"); omitZero {
+				omitZeroPatterns = true
+			}
+
+			if incNegative, _ := params.Optional[bool](request, "include_negative_patterns"); incNegative {
+				includeNegativePatterns = true
+			}
+
+			if incMissingUnderOther, _ := params.Optional[bool](request, "include_negative_patterns"); incMissingUnderOther {
+				includeMissingUnderOther = true
+			}
+
+			if vol, _ := params.Optional[string](request, "volatility"); vol != "" {
+				volatility = vol
+			} else {
+				volatility = "all"
+			}
+
+			if volOffset, _ := params.Optional[string](request, "volatility_offset"); volOffset != "" {
+				volatilityOffset = volOffset
+			} else {
+				volatilityOffset = "24h"
+			}
+
+			payload := map[string]any{
+				"queries": map[string]any{
+					"Q1": map[string]any{
+						"scope":        "pattern",
+						"query":        query,
+						"omitZero":     omitZeroPatterns,
+						"negative":     includeNegativePatterns,
+						"includeOther": includeMissingUnderOther,
+						"volatility":   volatility,
+						"offset":       volatilityOffset,
+					},
+				},
+				"formulas": map[string]any{
+					"R1": map[string]string{
+						"formula": "Q1",
+					},
+				},
+			}
+
+			buffer := bytes.NewBuffer(nil)
+			if err := json.NewEncoder(buffer).Encode(payload); err != nil {
+				return nil, fmt.Errorf("failed to encode request body: %w", err)
+			}
+
+			queryParams := searchURL.Query()
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
@@ -495,26 +594,16 @@ service.name:("api" OR "web")`),
 				queryParams.Add("to", to)
 			}
 
-			if summary, _ := params.Optional[bool](request, "summary"); summary {
-				queryParams.Add("summary", "true")
+			if limit := request.GetInt("limit", 0); limit > 0 {
+				queryParams.Add("limit", fmt.Sprintf("%d", limit))
 			}
 
-			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
-				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
-			} else {
-				// add always default limit if not provided
-				queryParams.Add("limit", "20")
+			if order, _ := params.Optional[string](request, "order"); order != "" {
+				queryParams.Add("order", order)
 			}
 
-			if offset, _ := params.Optional[string](request, "offset"); offset != "" {
-				queryParams.Add("offset", offset)
-			}
-			if negative, _ := params.Optional[bool](request, "negative"); negative {
-				queryParams.Add("negative", "true")
-			}
-
-			statsURL.RawQuery = queryParams.Encode()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, statsURL.String(), nil)
+			searchURL.RawQuery = queryParams.Encode()
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL.String(), buffer)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
@@ -533,8 +622,8 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to read response body: %v", err)
 			}
 
-			if resp.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("failed to get clustering stats, status code %d: %s", resp.StatusCode, string(bodyBytes))
+			if resp.StatusCode != http.StatusMultiStatus {
+				return nil, fmt.Errorf("failed to graph patterns, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
 			return mcp.NewToolResultText(string(bodyBytes)), nil
