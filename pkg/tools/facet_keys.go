@@ -29,6 +29,20 @@ var MetricFacetKeysResource = mcp.NewResource(
 	mcp.WithMIMEType("application/json"),
 )
 
+var TraceFacetKeysResource = mcp.NewResource(
+	"facet-keys://traces",
+	"Trace Facet Keys",
+	mcp.WithResourceDescription("List of available facet keys for traces."),
+	mcp.WithMIMEType("application/json"),
+)
+
+var PatternFacetKeysResource = mcp.NewResource(
+	"facet-keys://patterns",
+	"Pattern Facet Keys",
+	mcp.WithResourceDescription("List of available facet keys for patterns."),
+	mcp.WithMIMEType("application/json"),
+)
+
 var EventFacetKeysResource = mcp.NewResource(
 	"facet-keys://events",
 	"Event Facet Keys",
@@ -119,6 +133,50 @@ func MetricFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		result, err := json.Marshal(facetKeys)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal metric facet keys: %w", err)
+		}
+
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     string(result),
+			},
+		}, nil
+	}
+}
+
+func TraceFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		facetKeys, err := GetFacetKeys(ctx, client, "trace")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get trace facet keys: %w", err)
+		}
+
+		result, err := json.Marshal(facetKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal trace facet keys: %w", err)
+		}
+
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     string(result),
+			},
+		}, nil
+	}
+}
+
+func PatternFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
+	return func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		facetKeys, err := GetFacetKeys(ctx, client, "pattern")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pattern facet keys: %w", err)
+		}
+
+		result, err := json.Marshal(facetKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal pattern facet keys: %w", err)
 		}
 
 		return []mcp.ResourceContents{
