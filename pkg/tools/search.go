@@ -132,7 +132,7 @@ func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandl
 	return mcp.NewTool("get_metric_search",
 			mcp.WithDescription(`Search Metrics`),
 			mcp.WithString("metric_name",
-				mcp.Description(`Metric name that will be searched for`),
+				mcp.Description(`Metric name that will be searched for. Wildcards and regexes are not supported, it should be a plain name. For available metric names, please use "facet_options" tool with "metric" scope and "name" facet path.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",

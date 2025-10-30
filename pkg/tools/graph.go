@@ -144,7 +144,7 @@ func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 	return mcp.NewTool("get_metric_graph",
 			mcp.WithDescription(`Render a graph from metrics`),
 			mcp.WithString("metric_name",
-				mcp.Description(`Metric name that will be used for constructing the graph`),
+				mcp.Description(`Metric name that will be used for constructing the graph. Wildcards and regexes are not supported, it should be a plain name. For available metric names, please use "facet_options" tool with "metric" scope and "name" facet path.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
