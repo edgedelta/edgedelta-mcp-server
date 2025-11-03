@@ -463,6 +463,10 @@ Keys are ANDed together; values within a key are ORed. Discover keys via "facet-
 			mcp.WithBoolean("include_child_spans",
 				mcp.Description("If true, include child spans for matched spans to provide full trace context."),
 			),
+			mcp.WithString("data_type",
+				mcp.Description("Data type for trace graph. Use 'request' for counts or 'latency' for percentile series."),
+				mcp.DefaultString("request"),
+			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(false),
 			mcp.WithDestructiveHintAnnotation(false),
@@ -474,17 +478,51 @@ Keys are ANDed together; values within a key are ORed. Discover keys via "facet-
 				return nil, err
 			}
 
-			// Build query parameters
-			tracesURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/traces", client.APIURL(), orgID))
+			// Use /graph endpoint to perform trace search with table output
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
 			if err != nil {
 				return nil, err
 			}
 
-			queryParams := tracesURL.Query()
-			if query, _ := params.Optional[string](request, "query"); query != "" {
-				queryParams.Add("query", query)
+			// Build graph payload
+			var query string
+			if q, _ := params.Optional[string](request, "query"); q != "" {
+				query = q
+			}
+			includeChildSpans := false
+			if include, _ := params.Optional[bool](request, "include_child_spans"); include {
+				includeChildSpans = true
 			}
 
+			// determine data type
+			dataType := "request"
+			if dt, _ := params.Optional[string](request, "data_type"); dt != "" {
+				dataType = dt
+			}
+
+			payload := map[string]any{
+				"queries": map[string]any{
+					"Q1": map[string]any{
+						"scope":             "trace",
+						"query":             query,
+						"dataType":          dataType,
+						"includeChildSpans": includeChildSpans,
+					},
+				},
+				"formulas": map[string]any{
+					"R1": map[string]any{
+						"formula": "Q1",
+					},
+				},
+			}
+
+			buffer := bytes.NewBuffer(nil)
+			if err := json.NewEncoder(buffer).Encode(payload); err != nil {
+				return nil, fmt.Errorf("failed to encode request body: %w", err)
+			}
+
+			// Build query params
+			queryParams := searchURL.Query()
 			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
 				queryParams.Add("lookback", lookback)
 			}
@@ -500,7 +538,6 @@ Keys are ANDed together; values within a key are ORed. Discover keys via "facet-
 			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
 				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
 			} else {
-				// add always default limit if not provided
 				queryParams.Add("limit", "20")
 			}
 
@@ -512,14 +549,13 @@ Keys are ANDed together; values within a key are ORed. Discover keys via "facet-
 				queryParams.Add("order", order)
 			}
 
-			if include, _ := params.Optional[bool](request, "include_child_spans"); include {
-				queryParams.Add("include_child_spans", "true")
-			}
+			// Ensure timeseries graph output for TraceChartRaw
+			queryParams.Add("graph_type", "timeseries")
 
-			tracesURL.RawQuery = queryParams.Encode()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, tracesURL.String(), nil)
+			searchURL.RawQuery = queryParams.Encode()
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL.String(), buffer)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %v", err)
+				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
@@ -533,11 +569,12 @@ Keys are ANDed together; values within a key are ORed. Discover keys via "facet-
 			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %v", err)
+				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 
-			if resp.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("failed to search traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
+			// Graph endpoint responses are 207 Multi-Status
+			if resp.StatusCode != http.StatusMultiStatus {
+				return nil, fmt.Errorf("failed to search traces (graph), status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
 			return mcp.NewToolResultText(string(bodyBytes)), nil
