@@ -629,3 +629,118 @@ Default is "*" to include all patterns`),
 			return mcp.NewToolResultText(string(bodyBytes)), nil
 		}
 }
+
+// GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
+func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_trace_timeline",
+			mcp.WithDescription(`Fetch spans (OTel) for a timeline view using trace facet queries. Combine facets to narrow results; different keys are ANDed, values within a key are ORed. Use "facet-keys://traces" to discover available keys and "services://list" to discover service names.`),
+			mcp.WithString("query",
+				mcp.Description(`Trace facet query. Examples:\nservice.name:"api"\n'span.name':"GET /checkout"\nstatus.code:"ERROR"\nservice.name:("api" OR "web")\n-attributes.http.route:"/healthz"`),
+				mcp.DefaultString(""),
+			),
+			mcp.WithString("lookback",
+				mcp.Description("Lookback period in Go duration format (e.g., 1h, 15m, 24h). Provide either lookback or from/to."),
+				mcp.DefaultString("1h"),
+			),
+			mcp.WithString("from",
+				mcp.Description("From datetime (ISO 8601: 2006-01-02T15:04:05.000Z). Use with 'to' when not using lookback."),
+				mcp.DefaultString(""),
+			),
+			mcp.WithString("to",
+				mcp.Description("To datetime (ISO 8601: 2006-01-02T15:04:05.000Z). Use with 'from' when not using lookback."),
+				mcp.DefaultString(""),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum number of items to return per page (default 20, max 1000)."),
+				mcp.DefaultNumber(20),
+			),
+			mcp.WithString("cursor",
+				mcp.Description("Pagination cursor from a previous response (use next_cursor/previous_cursor)."),
+				mcp.DefaultString(""),
+			),
+			mcp.WithString("order",
+				mcp.Description("Sort order: 'ASC' or 'DESC' (case-insensitive)."),
+				mcp.DefaultString("desc"),
+			),
+			mcp.WithBoolean("include_child_spans",
+				mcp.Description("If true, include child spans for matched spans to provide full trace context."),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			orgID, token, err := FetchContextKeys(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			// Build query parameters for traces search
+			tracesURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/traces", client.APIURL(), orgID))
+			if err != nil {
+				return nil, err
+			}
+
+			queryParams := tracesURL.Query()
+			if query, _ := params.Optional[string](request, "query"); query != "" {
+				queryParams.Add("query", query)
+			}
+
+			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
+				queryParams.Add("lookback", lookback)
+			}
+
+			if from, _ := params.Optional[string](request, "from"); from != "" {
+				queryParams.Add("from", from)
+			}
+
+			if to, _ := params.Optional[string](request, "to"); to != "" {
+				queryParams.Add("to", to)
+			}
+
+			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
+				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
+			} else {
+				queryParams.Add("limit", "20")
+			}
+
+			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
+				queryParams.Add("cursor", cursor)
+			}
+
+			if order, _ := params.Optional[string](request, "order"); order != "" {
+				queryParams.Add("order", order)
+			}
+
+			if include, _ := params.Optional[bool](request, "include_child_spans"); include {
+				queryParams.Add("include_child_spans", "true")
+			}
+
+			tracesURL.RawQuery = queryParams.Encode()
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, tracesURL.String(), nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create request: %v", err)
+			}
+
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("X-ED-API-Token", token)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response body: %v", err)
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				return nil, fmt.Errorf("failed to search traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
+			}
+
+			return mcp.NewToolResultText(string(bodyBytes)), nil
+		}
+}
