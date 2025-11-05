@@ -422,8 +422,6 @@ service.name:("api" OR "web")`),
 		}
 }
 
-// (removed) GetTraceSearchTool was deprecated in favor of get_trace_timeline
-
 // GetLogPatternsTool creates a tool to get pattern stats
 func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_patterns",
