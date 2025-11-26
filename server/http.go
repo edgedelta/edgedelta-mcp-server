@@ -25,6 +25,13 @@ func WithStateless(stateless bool) ServerOption {
 	}
 }
 
+// WithDisableStreaming sets whether the server should disable streaming or not
+func WithDisableStreaming(disableStreaming bool) ServerOption {
+	return func(c *serverConfig) {
+		c.disableStreaming = disableStreaming
+	}
+}
+
 // MCPHTTPServer wraps the HTTP server and its dependencies
 type MCPHTTPServer struct {
 	httpServer *server.StreamableHTTPServer
@@ -75,6 +82,7 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 		s,
 		server.WithHTTPContextFunc(authMiddleware),
 		server.WithStateLess(config.stateless),
+		server.WithDisableStreaming(config.disableStreaming),
 	)
 
 	return &MCPHTTPServer{

@@ -18,8 +18,9 @@ var (
 		apiTokenHeader: "X-ED-API-Token",
 		logger:         slog.Default(),
 		// HTTP server options
-		port:      8080,
-		stateless: true,
+		port:             8080,
+		stateless:        true,
+		disableStreaming: true,
 	}
 )
 
@@ -85,8 +86,9 @@ type serverConfig struct {
 	logger         *slog.Logger
 
 	// HTTP server options
-	port      int
-	stateless bool
+	port             int
+	stateless        bool
+	disableStreaming bool
 }
 
 // ServerOption configures the MCP server
