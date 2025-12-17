@@ -48,6 +48,7 @@ func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerO
 
 func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.GetPipelinesTool(client))
+	s.AddTool(tools.GetPipelineConfigTool(client))
 	s.AddTool(tools.GetPipelineHistoryTool(client))
 	s.AddTool(tools.DeployPipelineTool(client))
 	s.AddTool(tools.AddPipelineSourceTool(client))
