@@ -36,7 +36,7 @@ func WithLimit(limit string) QueryParamOption {
 	}
 }
 
-// GetPipelinesTool creates a tool to search for logs.
+// GetPipelinesTool creates a tool to search for pipelines.
 func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipelines",
 			mcp.WithDescription("Get pipelines from Edge Delta for last 5 recent updated pipelines. It is a tool to get the pipelines from Edge Delta."),
@@ -92,11 +92,56 @@ func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 		}
 }
 
-func getNumber(s string) (int, bool) {
-	if i, err := strconv.Atoi(s); err == nil {
-		return i, true
-	}
-	return 0, false
+// GetPipelineConfigTool creates a tool to retrieve a specific pipeline.
+func GetPipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("get_pipeline_config",
+			mcp.WithDescription("Retrieve a specific pipeline's (according to config ID) details from Edge Delta. This will return pipeline's config content in addition to other details such as fleet and environment type etc."),
+			mcp.WithString("conf_id",
+				mcp.Description("Config ID of the pipeline"),
+				mcp.Required(),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			orgID, token, err := FetchContextKeys(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			confID, err := request.RequireString("conf_id")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: conf_id"), err
+			}
+
+			historyURL := fmt.Sprintf("%s/v1/orgs/%s/confs/%s", client.APIURL(), orgID, confID)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create request: %w", err)
+			}
+
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("X-ED-API-Token", token)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return nil, err
+			}
+
+			defer resp.Body.Close()
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response body: %w", err)
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				return nil, fmt.Errorf("failed to get pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
+			}
+
+			return mcp.NewToolResultText(string(bodyBytes)), nil
+		}
 }
 
 // GetPipelineHistoryTool creates a tool to get pipeline configuration history
@@ -332,4 +377,11 @@ Example node configurations:
 
 			return mcp.NewToolResultText(string(bodyBytes)), nil
 		}
+}
+
+func getNumber(s string) (int, bool) {
+	if i, err := strconv.Atoi(s); err == nil {
+		return i, true
+	}
+	return 0, false
 }
