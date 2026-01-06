@@ -201,7 +201,7 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 	return returnPipelines, nil
 }
 
-func SavePipeline(ctx context.Context, client Client, confID, description, pipeline, content string) (map[string]interface{}, error) {
+func SavePipeline(ctx context.Context, client Client, confID, description, pipeline, content string) (map[string]any, error) {
 	orgID, token, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -252,7 +252,7 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 		return nil, fmt.Errorf("failed to save pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode save pipeline response: %v", err)
 	}

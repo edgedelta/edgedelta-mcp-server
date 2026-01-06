@@ -30,8 +30,40 @@ type FacetsResponse struct {
 	UserDefined []Facet `json:"userDefined"`
 }
 
+type FacetsToolResponse struct {
+	Scope    string         `json:"scope"`
+	Facets   []Facet        `json:"facets"`
+	Guidance *FacetGuidance `json:"guidance,omitempty"`
+}
+
+type FacetGuidance struct {
+	ResultStatus string   `json:"result_status"`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+}
+
+type FacetOptionsResponse struct {
+	FacetPath   string         `json:"facet_path"`
+	Scope       string         `json:"scope"`
+	TotalValues int            `json:"total_values"`
+	Options     []FacetOption  `json:"options"`
+	Guidance    *FacetGuidance `json:"guidance,omitempty"`
+}
+
 var FacetsTool = mcp.NewTool("facets",
-	mcp.WithDescription("Retrieves facets for the given scope. This can be used to filter search results."),
+	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
+
+WHEN TO USE:
+- Use discover_schema instead for most cases - it provides facet_keys plus sample values
+- Use this tool only if you need a complete list of field names without values
+
+This tool returns field NAMES only, not their values.
+To get VALUES for a field, use facet_options tool.
+
+Example workflow:
+1. facets(scope:"log") → returns field names like ["service.name", "host.name", ...]
+2. facet_options(scope:"log", facet_path:"service.name") → returns values like ["api", "web", ...]
+3. Use values in CQL query: service.name:"api"`),
 	mcp.WithString("scope",
 		mcp.Description("The scope to retrieve facets for. Available scopes: 'log', 'metric', 'trace'"),
 		mcp.Required(),
@@ -51,7 +83,21 @@ var FacetsResource = mcp.NewResourceTemplate(
 )
 
 var FacetOptionsTool = mcp.NewTool("facet_options",
-	mcp.WithDescription("Retrieves facet options for the facet in the scope. This can be used to filter search in logs, metrics, and traces with syntax <facet_path>:<facet_option>"),
+	mcp.WithDescription(`Retrieves all available values for a specific field (facet) in the given scope.
+
+WHEN TO USE:
+- After discover_schema returns facet_keys, use this to get VALUES for any field
+- discover_schema only pre-fetches values for a few common fields (service.name, severity_text, etc.)
+- For ALL OTHER fields in facet_keys, call facet_options to get their values
+- Use before constructing queries to ensure values exist in your data
+
+Example workflow:
+1. discover_schema returns facet_keys: ["service.name", "host.name", "k8s.pod.name", "custom.field"]
+2. common_fields only has values for: service.name, host.name
+3. To get values for k8s.pod.name or custom.field → call facet_options
+
+Usage: facet_options(scope:"log", facet_path:"k8s.pod.name") returns all pod names
+Then use in query: k8s.pod.name:"my-pod-abc123"`),
 	mcp.WithString("facet_path",
 		mcp.Description("The facet path to retrieve options for."),
 		mcp.Required(),
@@ -90,7 +136,21 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to get facets, err: %w", err)
 		}
 
-		r, err := json.Marshal(result)
+		// Wrap result with guidance
+		response := FacetsToolResponse{
+			Scope:  scope,
+			Facets: result,
+			Guidance: &FacetGuidance{
+				ResultStatus: "success",
+				NextSteps: []string{
+					"Use facet_options tool to get available VALUES for any field listed above.",
+					fmt.Sprintf("Example: facet_options(scope:\"%s\", facet_path:\"<field_name>\") to see values.", scope),
+					"Use these field names in your CQL queries: field:\"value\"",
+				},
+			},
+		}
+
+		r, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}
@@ -147,7 +207,43 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to get facet options, err: %w", err)
 		}
 
-		r, err := json.Marshal(result)
+		// Wrap result with guidance
+		var options []FacetOption
+		if result != nil {
+			options = result.Options
+		}
+
+		response := FacetOptionsResponse{
+			FacetPath:   facet,
+			Scope:       scope,
+			TotalValues: len(options),
+			Options:     options,
+		}
+
+		if len(options) == 0 {
+			response.Guidance = &FacetGuidance{
+				ResultStatus: "empty",
+				NextSteps: []string{
+					fmt.Sprintf("No values found for field '%s' in scope '%s'.", facet, scope),
+					"This field may not have data in the current time range.",
+				},
+				Suggestions: []string{
+					"Use discover_schema to see all available fields for this scope.",
+					"Try a different field name from facet_keys.",
+				},
+			}
+		} else {
+			response.Guidance = &FacetGuidance{
+				ResultStatus: "success",
+				NextSteps: []string{
+					fmt.Sprintf("Use these values in your CQL query: %s:\"<value>\"", facet),
+					"Use validate_cql to check your query syntax before executing.",
+					fmt.Sprintf("Example: %s:\"%s\"", facet, options[0].Name),
+				},
+			}
+		}
+
+		r, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}

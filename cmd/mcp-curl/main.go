@@ -74,8 +74,8 @@ type (
 
 	// RequestParams contains the tool name and arguments
 	RequestParams struct {
-		Name      string                 `json:"name"`
-		Arguments map[string]interface{} `json:"arguments"`
+		Name      string         `json:"name"`
+		Arguments map[string]any `json:"arguments"`
 	}
 
 	// Define structure to match the response format
@@ -307,8 +307,8 @@ func addCommandFromTool(toolsCmd *cobra.Command, tool *Tool, prettyPrint bool) {
 }
 
 // buildArgumentsMap extracts flag values into a map of arguments
-func buildArgumentsMap(cmd *cobra.Command, tool *Tool) (map[string]interface{}, error) {
-	arguments := make(map[string]interface{})
+func buildArgumentsMap(cmd *cobra.Command, tool *Tool) (map[string]any, error) {
+	arguments := make(map[string]any)
 
 	for name, prop := range tool.InputSchema.Properties {
 		switch prop.Type {
@@ -334,7 +334,7 @@ func buildArgumentsMap(cmd *cobra.Command, tool *Tool) (map[string]interface{}, 
 					}
 				} else if prop.Items.Type == "object" {
 					if jsonStr, _ := cmd.Flags().GetString(name + "-json"); jsonStr != "" {
-						var jsonArray []interface{}
+						var jsonArray []any
 						if err := json.Unmarshal([]byte(jsonStr), &jsonArray); err != nil {
 							return nil, fmt.Errorf("error parsing JSON for %s: %w", name, err)
 						}
@@ -349,7 +349,7 @@ func buildArgumentsMap(cmd *cobra.Command, tool *Tool) (map[string]interface{}, 
 }
 
 // buildJSONRPCRequest creates a JSON-RPC request with the given tool name and arguments
-func buildJSONRPCRequest(method, toolName string, arguments map[string]interface{}) (string, error) {
+func buildJSONRPCRequest(method, toolName string, arguments map[string]any) (string, error) {
 	id, err := rand.Int(rand.Reader, big.NewInt(10000))
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random ID: %w", err)
@@ -427,7 +427,7 @@ func printResponse(response string, prettyPrint bool) error {
 	for _, content := range resp.Result.Content {
 		if content.Type == "text" {
 			// Unmarshal the text content
-			var textContent map[string]interface{}
+			var textContent map[string]any
 			if err := json.Unmarshal([]byte(content.Text), &textContent); err != nil {
 				return fmt.Errorf("failed to parse text content: %w", err)
 			}

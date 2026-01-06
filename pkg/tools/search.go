@@ -15,15 +15,53 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+type SearchResponse struct {
+	Data       json.RawMessage `json:"data"`
+	TotalCount int             `json:"total_count"`
+	Query      string          `json:"query_used,omitempty"`
+	Guidance   *SearchGuidance `json:"guidance,omitempty"`
+}
+
+type SearchGuidance struct {
+	ResultStatus string   `json:"result_status"`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+}
+
 // GetLogSearchTool creates a tool to search logs
 func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_search",
-			mcp.WithDescription(`Search logs`),
+			mcp.WithDescription(`Search logs using CQL (Common Query Language).
+
+IMPORTANT: Before using this tool, call discover_schema with scope:"log" to see available fields and values.
+
+CQL Syntax:
+- Field equals: field:"value" or field:value (colon operator)
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value" or NOT field:"value"
+- Boolean: term1 AND term2 (space defaults to AND)
+- Comparison: field > 100, field <= 50
+- Wildcards: "*pattern*" or "pattern*" (at boundaries only)
+- Full-text: just type words without field prefix
+
+Field Types:
+- Resource fields: service.name, severity_text, host.name, ed.tag
+- Attribute fields: @custom_field (use @ prefix for attributes)
+
+NOT SUPPORTED: Regular expressions (/pattern/)
+
+If you get empty results:
+1. Check field names with discover_schema
+2. Verify values exist with facet_options
+3. Try broader time range or simpler query
+4. Use validate_cql to check syntax`),
 			mcp.WithString("query",
-				mcp.Description(`Log facets are to target the search. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://logs" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")`),
+				mcp.Description(`CQL query string. Examples:
+- service.name:"api" AND severity_text:"ERROR"
+- service.name:("api" OR "web") AND -severity_text:"DEBUG"
+- @response.code > 400
+- error OR exception (full-text search)
+Use discover_schema or facet_options first to verify field names.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -123,33 +161,105 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			query, _ := params.Optional[string](request, "query")
+			return formatSearchResponse(bodyBytes, "log", query)
 		}
+}
+
+func formatSearchResponse(bodyBytes []byte, scope, query string) (*mcp.CallToolResult, error) {
+	var genericResp map[string]any
+	if err := json.Unmarshal(bodyBytes, &genericResp); err != nil {
+		return mcp.NewToolResultText(string(bodyBytes)), nil
+	}
+
+	totalCount := 0
+	if items, ok := genericResp["items"].([]any); ok {
+		// ArchiveResponseV1 (logs) and EventResponse (events)
+		totalCount = len(items)
+	} else if stats, ok := genericResp["stats"].([]any); ok {
+		// ClusterStatResponse (patterns)
+		totalCount = len(stats)
+	} else if records, ok := genericResp["records"].([]any); ok {
+		// CommonTimeseriesResponse (metrics graph)
+		totalCount = len(records)
+	}
+
+	response := SearchResponse{
+		Data:       bodyBytes,
+		TotalCount: totalCount,
+		Query:      query,
+	}
+
+	if totalCount == 0 {
+		response.Guidance = &SearchGuidance{
+			ResultStatus: "empty",
+			NextSteps: []string{
+				fmt.Sprintf("No results found for query: %s", query),
+				"This is a valid signal - the data may not exist for this time range or filter.",
+			},
+			Suggestions: []string{
+				fmt.Sprintf("Use discover_schema with scope:\"%s\" to see available fields and their values", scope),
+				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
+				"Simplify the query by removing filters one at a time",
+				"Use facet_options to verify the exact values available for each field",
+				"Use validate_cql to check if your query syntax is correct",
+			},
+		}
+	} else {
+		response.Guidance = &SearchGuidance{
+			ResultStatus: "success",
+			NextSteps: []string{
+				fmt.Sprintf("Found %d results", totalCount),
+			},
+		}
+	}
+
+	result, _ := json.Marshal(response)
+	return mcp.NewToolResultText(string(result)), nil
 }
 
 // GetMetricSearchTool creates a tool to search metrics
 func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_search",
-			mcp.WithDescription(`Search Metrics`),
+			mcp.WithDescription(`Search and aggregate metrics.
+
+IMPORTANT: Before using this tool:
+1. Use search_metrics to find the exact metric name (fuzzy search supported)
+2. Or use facet_options with scope:"metric" and facet_path:"name" for exact names
+
+Metric names must be EXACT - no wildcards or regex allowed.
+
+Filter query uses CQL syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+
+NOT SUPPORTED for metrics:
+- Full-text search (queries without field: prefix) - will cause error
+- Regular expressions (/pattern/)
+
+If you get empty results:
+1. Verify metric name exists with search_metrics
+2. Check filter values with facet_options
+3. Try broader time range`),
 			mcp.WithString("metric_name",
-				mcp.Description(`Metric name that will be searched for. Wildcards and regexes are not supported, it should be a plain name. For available metric names, please use "facet_options" tool with "metric" scope and "name" facet path.`),
+				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics first to find available metric names. Examples: "http.request.duration", "system.cpu.usage". NO wildcards or regex.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
-				mcp.Description(`Aggregation method that will apply while obtaining the result as metrics gets rolled up. "sum", "median", "count", "avg" (for average), "max" (for maximum) and "min" (for minimum) are the valid options`),
+				mcp.Description(`Aggregation method: "sum", "median", "count", "avg", "max", "min"`),
 				mcp.DefaultString("sum"),
 				mcp.Required(),
 			),
 			mcp.WithString("filter_query",
-				mcp.Description(`Metric facets are to target the search. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://metrics" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")
-Default is "*" to include all metrics`),
+				mcp.Description(`CQL filter query. Use field:"value" syntax. Examples:
+- service.name:"api"
+- service.name:("api" OR "web") AND ed.tag:"prod"
+Use "*" for no filter (default). Always verify field values with facet_options first.`),
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys that will be used during the metric search. One can refer "facet-keys://metrics" resource for available keys.`),
+				mcp.Description(`Grouping keys for the metric search. Use discover_schema with scope:"metric" or facet_options to see available keys. Common keys: service.name, host.name, ed.tag`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
@@ -298,27 +408,43 @@ Default is "*" to include all metrics`),
 			}
 
 			if resp.StatusCode != http.StatusMultiStatus {
-				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
+				return nil, fmt.Errorf("failed to search metrics, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			queryDesc := fmt.Sprintf("metric:%s filter:%s", metricName, filterQuery)
+			return formatSearchResponse(bodyBytes, "metric", queryDesc)
 		}
 }
 
 // GetEventSearchTool creates a tool to search events
 func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_event_search",
-			mcp.WithDescription("Search query using Edge Delta events search syntax, for anomaly search query should include event.type:pattern_anomaly"),
+			mcp.WithDescription(`Search events (anomalies, alerts, kubernetes events) using CQL.
+
+IMPORTANT: Call discover_schema with scope:"event" first to see available event types and domains.
+
+Common event queries:
+- event.type:"pattern_anomaly" - Log anomaly detections
+- event.type:"metric_threshold" - Metric alert triggers
+- event.type:"log_threshold" - Log alert triggers
+- event.domain:"Monitor Alerts" - All monitor-triggered events
+- event.domain:"K8s" - Kubernetes events
+
+CQL Syntax:
+- Field equals: field:"value"
+- Boolean: term1 AND term2
+- Negation: -field:"value"
+- Full-text search: just type words without field prefix (supported)
+
+NOT SUPPORTED: Regular expressions (/pattern/)
+
+If empty results: verify event.type/event.domain values with facet_options`),
 			mcp.WithString("query",
-				mcp.Description(`Log facets are for targeting the search, service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services.
-Keys are anded together and values in the keys are ORed. Examples;
-event.type:"pattern_anomaly" // all pattern anomalies
-event.domain:"Monitor Alerts" // all monitor events including logs, metrics, patterns
-event.domain:"K8s" // all kubernetes events
-service.name:"ingestor" AND event.type:pattern_anomaly" // all anomalies in ingestor service
-event.type:"metric_threshold" // all metric threshold exceeding monitor events
-event.type:"log_threshold" // all log threshold exceeding monitor events
-service.name:("api" OR "web")`),
+				mcp.Description(`CQL query for events. Examples:
+- event.type:"pattern_anomaly" (all anomalies)
+- service.name:"api" AND event.type:"pattern_anomaly"
+- event.domain:"Monitor Alerts"
+Use discover_schema or facet_options to verify field values.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -418,21 +544,37 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to search events, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			query, _ := params.Optional[string](request, "query")
+			return formatSearchResponse(bodyBytes, "event", query)
 		}
 }
 
 // GetLogPatternsTool creates a tool to get pattern stats
 func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_patterns",
-			mcp.WithDescription("Returns top log patterns (signatures of log messages) and their stats; count, proportion, sentiment and delta. If you want to get negative sentiments, you must set negative to true."),
+			mcp.WithDescription(`Get top log patterns (message signatures) with statistics.
+
+Returns pattern clusters with: count, proportion, sentiment (positive/negative/neutral), and delta (change over time).
+
+IMPORTANT: Call discover_schema with scope:"pattern" first to see available fields.
+
+CQL Syntax for query:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+- Full-text search: just type words without field prefix (supported)
+
+NOT SUPPORTED: Regular expressions (/pattern/)
+
+Common fields: service.name, host.name, ed.tag
+
+Note: Sentiment filtering is done via the negative parameter, not CQL.
+To find negative sentiment patterns (errors, warnings), set negative:true`),
 			mcp.WithString("query",
-				mcp.Description(`Pattern facets are for targeting the search.
-service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services.
-Keys are anded together and values in the keys are ORed. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")`),
+				mcp.Description(`CQL filter query. Examples:
+- service.name:"api" (patterns from api service)
+- service.name:("api" OR "web") AND ed.tag:"prod"
+Use discover_schema or facet_options to verify field values.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -537,6 +679,7 @@ service.name:("api" OR "web")`),
 				return nil, fmt.Errorf("failed to get clustering stats, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			query, _ := params.Optional[string](request, "query")
+			return formatSearchResponse(bodyBytes, "pattern", query)
 		}
 }
