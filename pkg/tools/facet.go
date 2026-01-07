@@ -54,20 +54,27 @@ var FacetsTool = mcp.NewTool("facets",
 	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
 
 WHEN TO USE:
-- Use discover_schema instead for most cases - it provides facet_keys plus sample values
+- Use discover_schema instead for most cases - it provides facet_keys plus sample values and CQL syntax
 - Use this tool only if you need a complete list of field names without values
 
 This tool returns field NAMES only, not their values.
 To get VALUES for a field, use facet_options tool.
+
+CQL SYNTAX REMINDER:
+- Field filter: field:"value" (use colon, NOT = or ==)
+- Attribute fields: @field:"value" (prefix with @)
+- Operators: AND, OR, NOT, - (negation prefix)
+- Comparison: field > 100, field <= 50
+- Grouping: field:("val1" OR "val2")
 
 Example workflow:
 1. facets(scope:"log") → returns field names like ["service.name", "host.name", ...]
 2. facet_options(scope:"log", facet_path:"service.name") → returns values like ["api", "web", ...]
 3. Use values in CQL query: service.name:"api"`),
 	mcp.WithString("scope",
-		mcp.Description("The scope to retrieve facets for. Available scopes: 'log', 'metric', 'trace'"),
+		mcp.Description("The scope to retrieve facets for. Available scopes: 'log', 'metric', 'trace', 'pattern', 'event'"),
 		mcp.Required(),
-		mcp.Enum("log", "metric", "trace"),
+		mcp.Enum("log", "metric", "trace", "pattern", "event"),
 	),
 	mcp.WithReadOnlyHintAnnotation(true),
 	mcp.WithIdempotentHintAnnotation(false),
@@ -91,6 +98,16 @@ WHEN TO USE:
 - For ALL OTHER fields in facet_keys, call facet_options to get their values
 - Use before constructing queries to ensure values exist in your data
 
+CQL SYNTAX REMINDER:
+- Use the exact value returned in your query: field:"exact_value"
+- For OR conditions: field:("value1" OR "value2")
+- For negation: -field:"value" or NOT field:"value"
+- Attribute fields use @ prefix: @custom.field:"value"
+
+SCOPE-SPECIFIC NOTES:
+- log, pattern, event: Support full-text search (terms without field: prefix)
+- metric, trace: Do NOT support full-text search (always use field:"value")
+
 Example workflow:
 1. discover_schema returns facet_keys: ["service.name", "host.name", "k8s.pod.name", "custom.field"]
 2. common_fields only has values for: service.name, host.name
@@ -103,9 +120,9 @@ Then use in query: k8s.pod.name:"my-pod-abc123"`),
 		mcp.Required(),
 	),
 	mcp.WithString("scope",
-		mcp.Description("The scope to retrieve facet options for. Available scopes: 'log', 'metric', 'trace'"),
+		mcp.Description("The scope to retrieve facet options for. Available scopes: 'log', 'metric', 'trace', 'pattern', 'event'"),
 		mcp.Required(),
-		mcp.Enum("log", "metric", "trace"),
+		mcp.Enum("log", "metric", "trace", "pattern", "event"),
 	),
 	mcp.WithString("limit",
 		mcp.Description("The maximum number of facet options to return. Default is 100."),

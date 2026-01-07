@@ -15,38 +15,59 @@ type FacetKey struct {
 	Key string `json:"key"`
 }
 
+// FacetKeysResourceResponse wraps facet keys with usage guidance for resources
+type FacetKeysResourceResponse struct {
+	Scope      string     `json:"scope"`
+	FacetKeys  []FacetKey `json:"facet_keys"`
+	UsageNotes string     `json:"usage_notes"`
+}
+
 var LogFacetKeysResource = mcp.NewResource(
 	"facet-keys://logs",
 	"Log Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for logs."),
+	mcp.WithResourceDescription(`Available field names for filtering logs. Use in CQL queries with syntax: field:"value".
+Common fields: service.name, severity_text, host.name, ed.tag, k8s.pod.name.
+Logs support full-text search (terms without field: prefix). Use facet_options to get values for any field.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var MetricFacetKeysResource = mcp.NewResource(
 	"facet-keys://metrics",
 	"Metric Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for metrics."),
+	mcp.WithResourceDescription(`Available field names for filtering metrics. Use in CQL queries with syntax: field:"value".
+Common fields: name (metric name), service.name, host.name, ed.tag.
+IMPORTANT: Metrics do NOT support full-text search - always use field:"value" syntax.
+Use search_metrics tool for fuzzy metric name discovery.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var TraceFacetKeysResource = mcp.NewResource(
 	"facet-keys://traces",
 	"Trace Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for traces."),
+	mcp.WithResourceDescription(`Available field names for filtering traces. Use in CQL queries with syntax: field:"value".
+Common fields: service.name, status.code, span.kind, ed.tag.
+IMPORTANT: Traces do NOT support full-text search - always use field:"value" syntax.
+Use facet_options to get values for any field.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var PatternFacetKeysResource = mcp.NewResource(
 	"facet-keys://patterns",
 	"Pattern Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for patterns."),
+	mcp.WithResourceDescription(`Available field names for filtering log patterns. Use in CQL queries with syntax: field:"value".
+Common fields: service.name, host.name, ed.tag.
+Patterns support full-text search (terms without field: prefix).
+Use get_log_patterns with negative:true for error/warning patterns.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var EventFacetKeysResource = mcp.NewResource(
 	"facet-keys://events",
 	"Event Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for events."),
+	mcp.WithResourceDescription(`Available field names for filtering events (alerts, anomalies). Use in CQL queries with syntax: field:"value".
+Common fields: event.type, event.domain, service.name, ed.monitor.type.
+Events support full-text search (terms without field: prefix).
+Event types include: pattern_anomaly, metric_threshold, log_threshold.`),
 	mcp.WithMIMEType("application/json"),
 )
 
@@ -108,7 +129,14 @@ func LogFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get log facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "log",
+			FacetKeys: facetKeys,
+			UsageNotes: `Logs support full-text search. Use facet_options to get values for any field.
+See cql://syntax resource for complete query syntax reference.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal log facet keys: %w", err)
 		}
@@ -130,7 +158,15 @@ func MetricFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get metric facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "metric",
+			FacetKeys: facetKeys,
+			UsageNotes: `IMPORTANT: Metrics do NOT support full-text search - always use field:"value".
+Use search_metrics for fuzzy metric name discovery.
+See cql://syntax resource for complete query syntax reference.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal metric facet keys: %w", err)
 		}
@@ -152,7 +188,15 @@ func TraceFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get trace facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "trace",
+			FacetKeys: facetKeys,
+			UsageNotes: `IMPORTANT: Traces do NOT support full-text search - always use field:"value".
+Common trace fields: service.name, status.code, span.kind.
+See cql://syntax resource for complete query syntax reference.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal trace facet keys: %w", err)
 		}
@@ -174,7 +218,14 @@ func PatternFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get pattern facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "pattern",
+			FacetKeys: facetKeys,
+			UsageNotes: `Patterns support full-text search. Use get_log_patterns with negative:true for error patterns.
+See cql://syntax resource for complete query syntax reference.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal pattern facet keys: %w", err)
 		}
@@ -196,7 +247,15 @@ func EventFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get event facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "event",
+			FacetKeys: facetKeys,
+			UsageNotes: `Events support full-text search (terms without field: prefix).
+Common fields: event.type, event.domain, service.name, ed.monitor.type.
+See cql://syntax resource for complete query syntax reference.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal event facet keys: %w", err)
 		}
