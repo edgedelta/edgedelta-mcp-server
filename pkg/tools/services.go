@@ -118,7 +118,7 @@ func ServicesResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := ServicesResourceResponse{
 			Services: services,
 			UsageNotes: `Use facet_options tool to verify a service name if not in this list.
-Use discover_schema or build_cql tool for CQL syntax guidance.`,
+Use build_cql to construct queries or validate_cql to check syntax.`,
 		}
 
 		result, err := json.Marshal(response)

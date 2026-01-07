@@ -33,28 +33,19 @@ func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 	return mcp.NewTool("get_log_search",
 			mcp.WithDescription(`Search logs using CQL (Common Query Language).
 
-IMPORTANT: Before using this tool, call discover_schema with scope:"log" to see available fields and values.
+IMPORTANT: Call discover_schema with scope:"log" first to see available fields and values.
 
 CQL Syntax:
-- Field equals: field:"value" or field:value (colon operator)
+- Field equals: field:"value"
 - Multiple values: field:("val1" OR "val2")
-- Negation: -field:"value" or NOT field:"value"
-- Boolean: term1 AND term2 (space defaults to AND)
-- Comparison: field > 100, field <= 50
-- Wildcards: "*pattern*" or "pattern*" (at boundaries only)
-- Full-text: just type words without field prefix
-
-Field Types:
-- Resource fields: service.name, severity_text, host.name, ed.tag
-- Attribute fields: @custom_field (use @ prefix for attributes)
+- Negation: -field:"value"
+- Full-text search: just type words without field prefix (supported)
 
 NOT SUPPORTED: Regular expressions (/pattern/)
 
-If you get empty results:
-1. Check field names with discover_schema
-2. Verify values exist with facet_options
-3. Try broader time range or simpler query
-4. Use validate_cql to check syntax`),
+Common fields: service.name, severity_text, host.name, ed.tag
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
 				mcp.Description(`CQL query string. Examples:
 - service.name:"api" AND severity_text:"ERROR"
@@ -238,10 +229,7 @@ NOT SUPPORTED for metrics:
 - Full-text search (queries without field: prefix) - will cause error
 - Regular expressions (/pattern/)
 
-If you get empty results:
-1. Verify metric name exists with search_metrics
-2. Check filter values with facet_options
-3. Try broader time range`),
+If empty results: verify metric name with search_metrics and filter values with facet_options`),
 			mcp.WithString("metric_name",
 				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics first to find available metric names. Examples: "http.request.duration", "system.cpu.usage". NO wildcards or regex.`),
 				mcp.Required(),
@@ -569,7 +557,8 @@ NOT SUPPORTED: Regular expressions (/pattern/)
 Common fields: service.name, host.name, ed.tag
 
 Note: Sentiment filtering is done via the negative parameter, not CQL.
-To find negative sentiment patterns (errors, warnings), set negative:true`),
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
 				mcp.Description(`CQL filter query. Examples:
 - service.name:"api" (patterns from api service)

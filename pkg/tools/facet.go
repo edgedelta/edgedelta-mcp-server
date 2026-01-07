@@ -58,19 +58,7 @@ WHEN TO USE:
 - Use this tool only if you need a complete list of field names without values
 
 This tool returns field NAMES only, not their values.
-To get VALUES for a field, use facet_options tool.
-
-CQL SYNTAX REMINDER:
-- Field filter: field:"value" (use colon, NOT = or ==)
-- Attribute fields: @field:"value" (prefix with @)
-- Operators: AND, OR, NOT, - (negation prefix)
-- Comparison: field > 100, field <= 50
-- Grouping: field:("val1" OR "val2")
-
-Example workflow:
-1. facets(scope:"log") → returns field names like ["service.name", "host.name", ...]
-2. facet_options(scope:"log", facet_path:"service.name") → returns values like ["api", "web", ...]
-3. Use values in CQL query: service.name:"api"`),
+To get VALUES for a field, use facet_options tool.`),
 	mcp.WithString("scope",
 		mcp.Description("The scope to retrieve facets for. Available scopes: 'log', 'metric', 'trace', 'pattern', 'event'"),
 		mcp.Required(),
@@ -98,23 +86,7 @@ WHEN TO USE:
 - For ALL OTHER fields in facet_keys, call facet_options to get their values
 - Use before constructing queries to ensure values exist in your data
 
-CQL SYNTAX REMINDER:
-- Use the exact value returned in your query: field:"exact_value"
-- For OR conditions: field:("value1" OR "value2")
-- For negation: -field:"value" or NOT field:"value"
-- Attribute fields use @ prefix: @custom.field:"value"
-
-SCOPE-SPECIFIC NOTES:
-- log, pattern, event: Support full-text search (terms without field: prefix)
-- metric, trace: Do NOT support full-text search (always use field:"value")
-
-Example workflow:
-1. discover_schema returns facet_keys: ["service.name", "host.name", "k8s.pod.name", "custom.field"]
-2. common_fields only has values for: service.name, host.name
-3. To get values for k8s.pod.name or custom.field → call facet_options
-
-Usage: facet_options(scope:"log", facet_path:"k8s.pod.name") returns all pod names
-Then use in query: k8s.pod.name:"my-pod-abc123"`),
+Use build_cql to construct queries or validate_cql to check syntax.`),
 	mcp.WithString("facet_path",
 		mcp.Description("The facet path to retrieve options for."),
 		mcp.Required(),
