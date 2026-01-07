@@ -50,6 +50,7 @@ func WithLimit(limit string) QueryParamOption {
 // GetPipelinesTool creates a tool to search for pipelines.
 func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipelines",
+			mcp.WithTitleAnnotation("Get Pipelines"),
 			mcp.WithDescription(`List pipelines from Edge Delta.
 
 WORKFLOW: This is the starting point for pipeline operations.
@@ -60,7 +61,7 @@ WORKFLOW: This is the starting point for pipeline operations.
 5. add_pipeline_source(conf_id, source) → add data source
 
 Returns recently updated pipelines with their conf_id (configuration ID) which is required for all other pipeline operations.`),
-			mcp.WithString("limit",
+			mcp.WithNumber("limit",
 				mcp.Description("Limit number of results, default is 5 and max is 10"),
 				mcp.DefaultNumber(5),
 			),
@@ -68,17 +69,17 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 				mcp.Description("Keyword to filter pipelines if provided should be in the pipeline tag"),
 				mcp.DefaultString(""),
 			),
-			mcp.WithString("lookback_days",
+			mcp.WithNumber("lookback_days",
 				mcp.Description("Lookback days to get pipelines, default is 7"),
 				mcp.DefaultNumber(7),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			limit, err := params.Optional[string](request, "limit")
+			limit, err := params.Optional[float64](request, "limit")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get limit, err: %w", err)
 			}
@@ -88,17 +89,22 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
 			}
 
-			lookbackDays, err := params.Optional[string](request, "lookback_days")
+			lookbackDays, err := params.Optional[float64](request, "lookback_days")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get lookback_days, err: %w", err)
 			}
 
-			lookbackDaysVal, ok := getNumber(lookbackDays)
-			if !ok {
-				lookbackDaysVal = defaultLookbackDaysForGetPipelines
+			lookbackDaysVal := defaultLookbackDaysForGetPipelines
+			if lookbackDays > 0 {
+				lookbackDaysVal = int(lookbackDays)
 			}
 
-			result, err := GetPipelines(ctx, client, lookbackDaysVal, WithLimit(limit), WithKeyword(keyword))
+			limitStr := ""
+			if limit > 0 {
+				limitStr = strconv.Itoa(int(limit))
+			}
+
+			result, err := GetPipelines(ctx, client, lookbackDaysVal, WithLimit(limitStr), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}
@@ -132,6 +138,7 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 // GetPipelineConfigTool creates a tool to retrieve a specific pipeline.
 func GetPipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_config",
+			mcp.WithTitleAnnotation("Get Pipeline Config"),
 			mcp.WithDescription(`Get detailed configuration for a specific pipeline.
 
 PREREQUISITE: Call get_pipelines first to obtain the conf_id.
@@ -150,7 +157,7 @@ After viewing config, you can:
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -214,6 +221,7 @@ After viewing config, you can:
 // GetPipelineHistoryTool creates a tool to get pipeline configuration history
 func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_history",
+			mcp.WithTitleAnnotation("Get Pipeline History"),
 			mcp.WithDescription(`Get version history for a pipeline configuration.
 
 PREREQUISITE: Call get_pipelines first to obtain the conf_id.
@@ -230,7 +238,7 @@ Workflow for deployment:
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -293,6 +301,7 @@ Workflow for deployment:
 // DeployPipelineTool creates a tool to deploy a pipeline configuration
 func DeployPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("deploy_pipeline",
+			mcp.WithTitleAnnotation("Deploy Pipeline"),
 			mcp.WithDescription(`Deploys a specific version of a pipeline configuration.
 
 PREREQUISITES (must be called in order):
@@ -437,6 +446,7 @@ Example node configurations:
 }`
 
 	return mcp.NewTool("add_pipeline_source",
+			mcp.WithTitleAnnotation("Add Pipeline Source"),
 			mcp.WithDescription(description),
 			mcp.WithString("conf_id",
 				mcp.Description("Config ID of the pipeline"),

@@ -27,6 +27,7 @@ type DashboardGuidance struct {
 // GetAllDashboardsTool creates a tool to get all dashboards
 func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_all_dashboards",
+			mcp.WithTitleAnnotation("Get All Dashboards"),
 			mcp.WithDescription(`List all dashboards in the organization.
 
 WORKFLOW: This is the entry point for dashboard operations.
@@ -38,7 +39,7 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 				mcp.Description("Include definitions in the response"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -106,6 +107,7 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 // GetDashboardTool creates a tool to get a specific dashboard
 func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_dashboard",
+			mcp.WithTitleAnnotation("Get Dashboard"),
 			mcp.WithDescription(`Get detailed configuration for a specific dashboard.
 
 PREREQUISITE: Call get_all_dashboards first to obtain the dashboard_id.
@@ -116,7 +118,7 @@ Returns full dashboard configuration including widget definitions and layout.`),
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),

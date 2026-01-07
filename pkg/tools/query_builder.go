@@ -60,6 +60,7 @@ var CommonFacetKeys = map[string][]string{
 // GetValidateCQLTool creates a tool to validate CQL queries before execution
 func GetValidateCQLTool() (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("validate_cql",
+			mcp.WithTitleAnnotation("Validate CQL Query"),
 			mcp.WithDescription(`Validates a CQL (Common Query Language) query BEFORE executing search.
 
 IMPORTANT: Always use this tool to check query syntax before calling search tools.
@@ -116,6 +117,7 @@ Returns validation result with errors, warnings, and suggestions for fixes.`),
 // GetBuildCQLTool creates a tool to build valid CQL queries from structured parameters
 func GetBuildCQLTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("build_cql",
+			mcp.WithTitleAnnotation("Build CQL Query"),
 			mcp.WithDescription(`Constructs a valid CQL query from structured filter parameters.
 
 Use this tool instead of manually writing CQL strings to avoid syntax errors.

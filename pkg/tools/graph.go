@@ -71,6 +71,7 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 // GetLogGraphTool creates a tool to render a graph from logs
 func GetLogGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_graph",
+			mcp.WithTitleAnnotation("Get Log Graph"),
 			mcp.WithDescription(`Render a time series graph of log counts.
 
 IMPORTANT: Call discover_schema with scope:"log" first to see available fields.
@@ -116,7 +117,7 @@ Use "*" for all logs. Verify fields with discover_schema first.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -210,6 +211,7 @@ Use "*" for all logs. Verify fields with discover_schema first.`),
 // GetMetricGraphTool creates a tool to render a graph from metrics
 func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_graph",
+			mcp.WithTitleAnnotation("Get Metric Graph"),
 			mcp.WithDescription(`Render a time series graph for a metric.
 
 IMPORTANT: Before using:
@@ -271,7 +273,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -397,6 +399,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 // GetTraceGraphTool creates a tool to render a graph from traces
 func GetTraceGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_graph",
+			mcp.WithTitleAnnotation("Get Trace Graph"),
 			mcp.WithDescription(`Render a time series graph from traces.
 
 IMPORTANT: Call discover_schema with scope:"trace" first to see available fields.
@@ -452,7 +455,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -559,6 +562,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 // GetPatternGraphTool creates a tool to render a graph from patterns
 func GetPatternGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pattern_graph",
+			mcp.WithTitleAnnotation("Get Pattern Graph"),
 			mcp.WithDescription(`Render a time series graph of log pattern counts.
 
 IMPORTANT: Call discover_schema with scope:"pattern" first to see available fields.
@@ -625,7 +629,7 @@ Use "*" for all patterns. Verify fields with discover_schema first.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -749,6 +753,7 @@ Use "*" for all patterns. Verify fields with discover_schema first.`),
 // GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
 func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_timeline",
+			mcp.WithTitleAnnotation("Get Trace Timeline"),
 			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
 
 IMPORTANT: Call discover_schema with scope:"trace" first to see available fields.
@@ -802,7 +807,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 				mcp.Description("If true, include child spans for matched spans to provide full trace context."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),

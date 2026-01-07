@@ -31,6 +31,7 @@ type SearchGuidance struct {
 // GetLogSearchTool creates a tool to search logs
 func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_search",
+			mcp.WithTitleAnnotation("Search Logs"),
 			mcp.WithDescription(`Search logs using CQL (Common Query Language).
 
 IMPORTANT: Call discover_schema with scope:"log" first to see available fields and values.
@@ -80,7 +81,7 @@ Use discover_schema or facet_options first to verify field names.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -211,6 +212,7 @@ func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, 
 // GetMetricSearchTool creates a tool to search metrics
 func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_search",
+			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Search and aggregate metrics.
 
 IMPORTANT: Before using this tool:
@@ -276,7 +278,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 				mcp.DefaultString("timeseries"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -406,6 +408,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 // GetEventSearchTool creates a tool to search events
 func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_event_search",
+			mcp.WithTitleAnnotation("Search Events"),
 			mcp.WithDescription(`Search events (anomalies, alerts, kubernetes events) using CQL.
 
 IMPORTANT: Call discover_schema with scope:"event" first to see available event types and domains.
@@ -459,7 +462,7 @@ Use discover_schema or facet_options to verify field values.`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -539,6 +542,7 @@ Use discover_schema or facet_options to verify field values.`),
 // GetLogPatternsTool creates a tool to get pattern stats
 func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_patterns",
+			mcp.WithTitleAnnotation("Get Log Patterns"),
 			mcp.WithDescription(`Get top log patterns (message signatures) with statistics.
 
 Returns pattern clusters with: count, proportion, sentiment (positive/negative/neutral), and delta (change over time).
@@ -592,7 +596,7 @@ Use discover_schema or facet_options to verify field values.`),
 				mcp.Description("Negative param is used to get negative sentiments."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),

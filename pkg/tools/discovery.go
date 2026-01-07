@@ -124,6 +124,7 @@ var sampleQueriesByScope = map[string][]string{
 // GetDiscoverSchemaTool creates a tool to discover available schema for building queries
 func GetDiscoverSchemaTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("discover_schema",
+			mcp.WithTitleAnnotation("Discover Schema"),
 			mcp.WithDescription(`Discovers available data schema for building queries.
 
 IMPORTANT: Call this tool FIRST before constructing any search queries.
@@ -240,6 +241,7 @@ After calling this tool, use validate_cql or build_cql to construct your query.`
 // GetSearchMetricsTool creates a tool for fuzzy metric name search
 func GetSearchMetricsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("search_metrics",
+			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Searches for metric names using fuzzy/partial matching.
 
 Use this tool BEFORE get_metric_search or get_metric_graph when you don't know the exact metric name.

@@ -51,6 +51,7 @@ type FacetOptionsResponse struct {
 }
 
 var FacetsTool = mcp.NewTool("facets",
+	mcp.WithTitleAnnotation("Get Facets"),
 	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
 
 WHEN TO USE:
@@ -65,7 +66,7 @@ To get VALUES for a field, use facet_options tool.`),
 		mcp.Enum("log", "metric", "trace", "pattern", "event"),
 	),
 	mcp.WithReadOnlyHintAnnotation(true),
-	mcp.WithIdempotentHintAnnotation(false),
+	mcp.WithIdempotentHintAnnotation(true),
 	mcp.WithDestructiveHintAnnotation(false),
 	mcp.WithOpenWorldHintAnnotation(false),
 )
@@ -78,6 +79,7 @@ var FacetsResource = mcp.NewResourceTemplate(
 )
 
 var FacetOptionsTool = mcp.NewTool("facet_options",
+	mcp.WithTitleAnnotation("Get Facet Options"),
 	mcp.WithDescription(`Retrieves all available values for a specific field (facet) in the given scope.
 
 WHEN TO USE:
@@ -100,7 +102,7 @@ Use build_cql to construct queries or validate_cql to check syntax.`),
 		mcp.DefaultString("100"),
 	),
 	mcp.WithReadOnlyHintAnnotation(true),
-	mcp.WithIdempotentHintAnnotation(false),
+	mcp.WithIdempotentHintAnnotation(true),
 	mcp.WithDestructiveHintAnnotation(false),
 	mcp.WithOpenWorldHintAnnotation(false),
 )
