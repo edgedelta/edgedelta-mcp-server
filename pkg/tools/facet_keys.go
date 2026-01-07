@@ -15,7 +15,6 @@ type FacetKey struct {
 	Key string `json:"key"`
 }
 
-// FacetKeysResourceResponse wraps facet keys with usage guidance for resources
 type FacetKeysResourceResponse struct {
 	Scope      string     `json:"scope"`
 	FacetKeys  []FacetKey `json:"facet_keys"`

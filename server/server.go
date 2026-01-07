@@ -83,7 +83,7 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 }
 
 func AddCustomResources(s *server.MCPServer, client tools.Client) {
-	// CQL syntax reference - centralized query syntax guidance
+	// CQL syntax reference
 	s.AddResource(tools.CQLReferenceResource, tools.CQLReferenceResourceHandler())
 
 	// Facet resources
