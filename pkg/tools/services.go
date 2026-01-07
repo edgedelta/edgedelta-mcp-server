@@ -38,11 +38,8 @@ type GraphResponse struct {
 var ServicesResource = mcp.NewResource(
 	"services://list",
 	"Services",
-	mcp.WithResourceDescription(`List of available service names in the organization for filtering logs, metrics, traces.
-Use in CQL queries with syntax: service.name:"service_name"
-Example: service.name:"api" AND severity_text:"ERROR"
-For multiple services: service.name:("api" OR "worker")
-Use facet_options to verify a service name exists if not in this list.`),
+	mcp.WithResourceDescription(`List of available service names in the organization.
+Services can be used to filter logs, metrics, traces, patterns, and events using the service.name field.`),
 	mcp.WithMIMEType("application/json"),
 )
 
@@ -120,10 +117,8 @@ func ServicesResourceHandler(client Client) server.ResourceHandlerFunc {
 
 		response := ServicesResourceResponse{
 			Services: services,
-			UsageNotes: `Use in CQL queries: service.name:"service_name".
-For multiple services: service.name:("api" OR "worker").
-Use facet_options to verify a service name if not in this list.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use facet_options tool to verify a service name if not in this list.
+Use discover_schema or build_cql tool for CQL syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)

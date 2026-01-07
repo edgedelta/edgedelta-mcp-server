@@ -24,49 +24,40 @@ type FacetKeysResourceResponse struct {
 var LogFacetKeysResource = mcp.NewResource(
 	"facet-keys://logs",
 	"Log Facet Keys",
-	mcp.WithResourceDescription(`Available field names for filtering logs. Use in CQL queries with syntax: field:"value".
-Common fields: service.name, severity_text, host.name, ed.tag, k8s.pod.name.
-Logs support full-text search (terms without field: prefix). Use facet_options to get values for any field.`),
+	mcp.WithResourceDescription(`Available field names for filtering logs.
+Common fields: service.name, severity_text, host.name, ed.tag, k8s.pod.name.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var MetricFacetKeysResource = mcp.NewResource(
 	"facet-keys://metrics",
 	"Metric Facet Keys",
-	mcp.WithResourceDescription(`Available field names for filtering metrics. Use in CQL queries with syntax: field:"value".
-Common fields: name (metric name), service.name, host.name, ed.tag.
-IMPORTANT: Metrics do NOT support full-text search - always use field:"value" syntax.
-Use search_metrics tool for fuzzy metric name discovery.`),
+	mcp.WithResourceDescription(`Available field names for filtering metrics.
+Common fields: name (metric name), service.name, host.name, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var TraceFacetKeysResource = mcp.NewResource(
 	"facet-keys://traces",
 	"Trace Facet Keys",
-	mcp.WithResourceDescription(`Available field names for filtering traces. Use in CQL queries with syntax: field:"value".
-Common fields: service.name, status.code, span.kind, ed.tag.
-IMPORTANT: Traces do NOT support full-text search - always use field:"value" syntax.
-Use facet_options to get values for any field.`),
+	mcp.WithResourceDescription(`Available field names for filtering traces.
+Common fields: service.name, status.code, span.kind, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var PatternFacetKeysResource = mcp.NewResource(
 	"facet-keys://patterns",
 	"Pattern Facet Keys",
-	mcp.WithResourceDescription(`Available field names for filtering log patterns. Use in CQL queries with syntax: field:"value".
-Common fields: service.name, host.name, ed.tag.
-Patterns support full-text search (terms without field: prefix).
-Use get_log_patterns with negative:true for error/warning patterns.`),
+	mcp.WithResourceDescription(`Available field names for filtering log patterns.
+Common fields: service.name, host.name, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var EventFacetKeysResource = mcp.NewResource(
 	"facet-keys://events",
 	"Event Facet Keys",
-	mcp.WithResourceDescription(`Available field names for filtering events (alerts, anomalies). Use in CQL queries with syntax: field:"value".
-Common fields: event.type, event.domain, service.name, ed.monitor.type.
-Events support full-text search (terms without field: prefix).
-Event types include: pattern_anomaly, metric_threshold, log_threshold.`),
+	mcp.WithResourceDescription(`Available field names for filtering events (alerts, anomalies).
+Common fields: event.type, event.domain, service.name, ed.monitor.type.`),
 	mcp.WithMIMEType("application/json"),
 )
 
@@ -131,8 +122,8 @@ func LogFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := FacetKeysResourceResponse{
 			Scope:     "log",
 			FacetKeys: facetKeys,
-			UsageNotes: `Logs support full-text search. Use facet_options to get values for any field.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use discover_schema or build_cql tool for query syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -160,9 +151,9 @@ func MetricFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := FacetKeysResourceResponse{
 			Scope:     "metric",
 			FacetKeys: facetKeys,
-			UsageNotes: `IMPORTANT: Metrics do NOT support full-text search - always use field:"value".
-Use search_metrics for fuzzy metric name discovery.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use search_metrics tool for fuzzy metric name discovery.
+Use facet_options tool to get values for any field.
+Use discover_schema or build_cql tool for query syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -190,9 +181,8 @@ func TraceFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := FacetKeysResourceResponse{
 			Scope:     "trace",
 			FacetKeys: facetKeys,
-			UsageNotes: `IMPORTANT: Traces do NOT support full-text search - always use field:"value".
-Common trace fields: service.name, status.code, span.kind.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use discover_schema or build_cql tool for query syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -220,8 +210,8 @@ func PatternFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := FacetKeysResourceResponse{
 			Scope:     "pattern",
 			FacetKeys: facetKeys,
-			UsageNotes: `Patterns support full-text search. Use get_log_patterns with negative:true for error patterns.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use discover_schema or build_cql tool for query syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -249,9 +239,8 @@ func EventFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 		response := FacetKeysResourceResponse{
 			Scope:     "event",
 			FacetKeys: facetKeys,
-			UsageNotes: `Events support full-text search (terms without field: prefix).
-Common fields: event.type, event.domain, service.name, ed.monitor.type.
-See cql://syntax resource for complete query syntax reference.`,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use discover_schema or build_cql tool for query syntax guidance.`,
 		}
 
 		result, err := json.Marshal(response)
