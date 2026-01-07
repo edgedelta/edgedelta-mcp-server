@@ -27,7 +27,7 @@ type GraphGuidance struct {
 	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
-func formatGraphResponse(bodyBytes []byte, scope, query string) (*mcp.CallToolResult, error) {
+func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, error) {
 	var graphResp GraphResponse
 	hasData := false
 
@@ -48,10 +48,9 @@ func formatGraphResponse(bodyBytes []byte, scope, query string) (*mcp.CallToolRe
 				"This is a valid signal - no data exists for this time range or filter.",
 			},
 			Suggestions: []string{
-				fmt.Sprintf("Use discover_schema with scope:\"%s\" to see available fields and their values", scope),
+				"Verify field values with facet_options to ensure the values exist in your data",
 				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
 				"Simplify the query by removing filters one at a time",
-				"Use facet_options to verify the exact values available for each field",
 				"Use validate_cql to check if your query syntax is correct",
 			},
 		}
@@ -204,7 +203,7 @@ Use "*" for all logs. Verify fields with discover_schema first.`),
 				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return formatGraphResponse(bodyBytes, "log", query)
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
@@ -391,7 +390,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 				return nil, fmt.Errorf("failed to search metrics, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return formatGraphResponse(bodyBytes, "metric", cql)
+			return formatGraphResponse(bodyBytes, cql)
 		}
 }
 
@@ -553,7 +552,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 				return nil, fmt.Errorf("failed to graph traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return formatGraphResponse(bodyBytes, "trace", query)
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
@@ -743,7 +742,7 @@ Use "*" for all patterns. Verify fields with discover_schema first.`),
 				return nil, fmt.Errorf("failed to graph patterns, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return formatGraphResponse(bodyBytes, "pattern", query)
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
@@ -880,6 +879,6 @@ NOTE: Full-text search is NOT supported for traces.`),
 				return nil, fmt.Errorf("failed to search traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return formatGraphResponse(bodyBytes, "trace", query)
+			return formatGraphResponse(bodyBytes, query)
 		}
 }

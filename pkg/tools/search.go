@@ -153,11 +153,11 @@ Use discover_schema or facet_options first to verify field names.`),
 			}
 
 			query, _ := params.Optional[string](request, "query")
-			return formatSearchResponse(bodyBytes, "log", query)
+			return formatSearchResponse(bodyBytes, query)
 		}
 }
 
-func formatSearchResponse(bodyBytes []byte, scope, query string) (*mcp.CallToolResult, error) {
+func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, error) {
 	var genericResp map[string]any
 	if err := json.Unmarshal(bodyBytes, &genericResp); err != nil {
 		return mcp.NewToolResultText(string(bodyBytes)), nil
@@ -189,10 +189,9 @@ func formatSearchResponse(bodyBytes []byte, scope, query string) (*mcp.CallToolR
 				"This is a valid signal - the data may not exist for this time range or filter.",
 			},
 			Suggestions: []string{
-				fmt.Sprintf("Use discover_schema with scope:\"%s\" to see available fields and their values", scope),
+				"Verify field values with facet_options to ensure the values exist in your data",
 				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
 				"Simplify the query by removing filters one at a time",
-				"Use facet_options to verify the exact values available for each field",
 				"Use validate_cql to check if your query syntax is correct",
 			},
 		}
@@ -400,7 +399,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 			}
 
 			queryDesc := fmt.Sprintf("metric:%s filter:%s", metricName, filterQuery)
-			return formatSearchResponse(bodyBytes, "metric", queryDesc)
+			return formatSearchResponse(bodyBytes, queryDesc)
 		}
 }
 
@@ -533,7 +532,7 @@ Use discover_schema or facet_options to verify field values.`),
 			}
 
 			query, _ := params.Optional[string](request, "query")
-			return formatSearchResponse(bodyBytes, "event", query)
+			return formatSearchResponse(bodyBytes, query)
 		}
 }
 
@@ -669,6 +668,6 @@ Use discover_schema or facet_options to verify field values.`),
 			}
 
 			query, _ := params.Optional[string](request, "query")
-			return formatSearchResponse(bodyBytes, "pattern", query)
+			return formatSearchResponse(bodyBytes, query)
 		}
 }

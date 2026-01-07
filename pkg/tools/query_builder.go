@@ -259,7 +259,7 @@ func validateCQL(query, scope string) CQLValidationResult {
 				}
 				if !isKnown && !strings.HasPrefix(fieldName, "@") {
 					result.Warnings = append(result.Warnings,
-						fmt.Sprintf("Field '%s' is not a commonly known facet for scope '%s'. Use discover_schema or facets tool to verify available fields.", fieldName, scope))
+						fmt.Sprintf("Field '%s' is not a commonly known facet for scope '%s'. Use facet_options to verify this field exists.", fieldName, scope))
 				}
 			}
 		}
@@ -284,7 +284,6 @@ func validateCQL(query, scope string) CQLValidationResult {
 			NextSteps: []string{
 				"Fix the errors above and validate again.",
 				"Use build_cql tool to construct queries from structured parameters to avoid syntax errors.",
-				"Use discover_schema to see available fields and correct syntax examples.",
 			},
 		}
 	}
@@ -374,7 +373,7 @@ func buildCQL(scope string, filters map[string]any) CQLBuildResult {
 	// Wrap with guidance and suggestions
 	if len(result.UnknownFields) > 0 {
 		result.Suggestions = append(result.Suggestions,
-			fmt.Sprintf("Unknown fields detected: %v. Use facets or discover_schema tool to verify field names for scope '%s'.",
+			fmt.Sprintf("Unknown fields detected: %v. Use facet_options to verify field names exist for scope '%s'.",
 				result.UnknownFields, scope))
 	}
 

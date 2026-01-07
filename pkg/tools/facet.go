@@ -81,9 +81,8 @@ var FacetOptionsTool = mcp.NewTool("facet_options",
 	mcp.WithDescription(`Retrieves all available values for a specific field (facet) in the given scope.
 
 WHEN TO USE:
-- After discover_schema returns facet_keys, use this to get VALUES for any field
-- discover_schema only pre-fetches values for a few common fields (service.name, severity_text, etc.)
-- For ALL OTHER fields in facet_keys, call facet_options to get their values
+- After discover_schema or facets tool returns field names, use this to get values for any field
+- discover_schema only pre-fetches up to 10 values for a few common fields; use facet_options for complete values or other fields
 - Use before constructing queries to ensure values exist in your data
 
 Use build_cql to construct queries or validate_cql to check syntax.`),
@@ -129,14 +128,28 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 		response := FacetsToolResponse{
 			Scope:  scope,
 			Facets: result,
-			Guidance: &FacetGuidance{
+		}
+
+		if len(result) == 0 {
+			response.Guidance = &FacetGuidance{
+				ResultStatus: "empty",
+				NextSteps: []string{
+					fmt.Sprintf("No facets found for scope '%s'.", scope),
+				},
+				Suggestions: []string{
+					"This scope may not have any indexed data yet.",
+					"Try a different scope: log, metric, trace, pattern, event.",
+				},
+			}
+		} else {
+			response.Guidance = &FacetGuidance{
 				ResultStatus: "success",
 				NextSteps: []string{
-					"Use facet_options tool to get available VALUES for any field listed above.",
+					"Use facet_options tool to get available values for any field listed above.",
 					fmt.Sprintf("Example: facet_options(scope:\"%s\", facet_path:\"<field_name>\") to see values.", scope),
-					"Use these field names in your CQL queries: field:\"value\"",
+					"Use build_cql to construct queries or validate_cql to check syntax.",
 				},
-			},
+			}
 		}
 
 		r, err := json.Marshal(response)
@@ -217,8 +230,8 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 					"This field may not have data in the current time range.",
 				},
 				Suggestions: []string{
-					"Use discover_schema to see all available fields for this scope.",
-					"Try a different field name from facet_keys.",
+					"Try a different field name - use the facets tool to see available fields.",
+					"Try a broader time range if this field should have values.",
 				},
 			}
 		} else {
@@ -226,8 +239,8 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 				ResultStatus: "success",
 				NextSteps: []string{
 					fmt.Sprintf("Use these values in your CQL query: %s:\"<value>\"", facet),
-					"Use validate_cql to check your query syntax before executing.",
 					fmt.Sprintf("Example: %s:\"%s\"", facet, options[0].Name),
+					"Use build_cql to construct queries or validate_cql to check syntax.",
 				},
 			}
 		}
