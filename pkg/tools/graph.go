@@ -35,6 +35,21 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 		hasData = len(graphResp.Records) > 0
 	}
 
+	// Check for formula-based response structure: {"R1": {"records": [...]}}
+	if !hasData {
+		var genericResp map[string]any
+		if err := json.Unmarshal(bodyBytes, &genericResp); err == nil {
+			for _, v := range genericResp {
+				if formulaResp, ok := v.(map[string]any); ok {
+					if records, ok := formulaResp["records"].([]any); ok && len(records) > 0 {
+						hasData = true
+						break
+					}
+				}
+			}
+		}
+	}
+
 	response := GraphToolResponse{
 		Data:  bodyBytes,
 		Query: query,
@@ -744,144 +759,6 @@ Use "*" for all patterns. Verify fields with discover_schema tool first.`),
 
 			if resp.StatusCode != http.StatusMultiStatus {
 				return nil, fmt.Errorf("failed to graph patterns, status code %d: %s", resp.StatusCode, string(bodyBytes))
-			}
-
-			return formatGraphResponse(bodyBytes, query)
-		}
-}
-
-// GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
-func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("get_trace_timeline",
-			mcp.WithTitleAnnotation("Get Trace Timeline"),
-			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
-
-IMPORTANT: Call discover_schema tool with scope:"trace" first to see available fields.
-
-CQL Syntax:
-- Field equals: field:"value"
-- Multiple values: field:("val1" OR "val2")
-- Negation: -field:"value"
-
-NOT SUPPORTED for traces:
-- Full-text search (queries without field: prefix) - will cause error
-- Regular expressions (/pattern/)
-
-Common fields: service.name, status.code, span.kind, ed.tag
-
-If empty results: verify field values with facet_options`),
-			mcp.WithString("query",
-				mcp.Description(`CQL filter query (field:value syntax required). Examples:
-- service.name:"api"
-- span.kind:"server"
-- status.code:"ERROR"
-- ed.tag:"prod" AND service.name:("api" OR "web")
-NOTE: Full-text search is NOT supported for traces.`),
-				mcp.DefaultString(""),
-			),
-			mcp.WithString("lookback",
-				mcp.Description("Lookback period in Go duration format (e.g., 1h, 15m, 24h). Provide either lookback or from/to. Pass empty string to use from/to instead."),
-				mcp.DefaultString("1h"),
-			),
-			mcp.WithString("from",
-				mcp.Description("From datetime (ISO 8601: 2006-01-02T15:04:05.000Z). Use with 'to' when not using lookback."),
-				mcp.DefaultString(""),
-			),
-			mcp.WithString("to",
-				mcp.Description("To datetime (ISO 8601: 2006-01-02T15:04:05.000Z). Use with 'from' when not using lookback."),
-				mcp.DefaultString(""),
-			),
-			mcp.WithNumber("limit",
-				mcp.Description("Maximum number of items to return per page (default 20, max 1000)."),
-				mcp.DefaultNumber(20),
-			),
-			mcp.WithString("cursor",
-				mcp.Description("Pagination cursor from a previous response (use next_cursor/previous_cursor)."),
-				mcp.DefaultString(""),
-			),
-			mcp.WithString("order",
-				mcp.Description("Sort order: 'ASC' or 'DESC' (case-insensitive)."),
-				mcp.DefaultString("desc"),
-			),
-			mcp.WithBoolean("include_child_spans",
-				mcp.Description("If true, include child spans for matched spans to provide full trace context."),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithOpenWorldHintAnnotation(false),
-		),
-		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			// Build query parameters for traces search
-			tracesURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/traces", client.APIURL(), orgID))
-			if err != nil {
-				return nil, err
-			}
-
-			queryParams := tracesURL.Query()
-			var query string
-			if q, _ := params.Optional[string](request, "query"); q != "" {
-				query = q
-				queryParams.Add("query", query)
-			}
-
-			if lookback, _ := params.Optional[string](request, "lookback"); lookback != "" {
-				queryParams.Add("lookback", lookback)
-			}
-
-			if from, _ := params.Optional[string](request, "from"); from != "" {
-				queryParams.Add("from", from)
-			}
-
-			if to, _ := params.Optional[string](request, "to"); to != "" {
-				queryParams.Add("to", to)
-			}
-
-			if limit, _ := params.Optional[float64](request, "limit"); limit > 0 {
-				queryParams.Add("limit", fmt.Sprintf("%.0f", limit))
-			} else {
-				queryParams.Add("limit", "20")
-			}
-
-			if cursor, _ := params.Optional[string](request, "cursor"); cursor != "" {
-				queryParams.Add("cursor", cursor)
-			}
-
-			if order, _ := params.Optional[string](request, "order"); order != "" {
-				queryParams.Add("order", order)
-			}
-
-			if include, _ := params.Optional[bool](request, "include_child_spans"); include {
-				queryParams.Add("include_child_spans", "true")
-			}
-
-			tracesURL.RawQuery = queryParams.Encode()
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, tracesURL.String(), nil)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %v", err)
-			}
-
-			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
-
-			resp, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-
-			defer resp.Body.Close()
-			bodyBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %v", err)
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				return nil, fmt.Errorf("failed to search traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
 			return formatGraphResponse(bodyBytes, query)
