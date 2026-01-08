@@ -15,6 +15,11 @@ type Service struct {
 	Name string `json:"name"`
 }
 
+type ServicesResourceResponse struct {
+	Services   []Service `json:"services"`
+	UsageNotes string    `json:"usage_notes"`
+}
+
 type GraphRecord struct {
 	Values    []string `json:"values"`
 	Aggregate struct {
@@ -33,7 +38,8 @@ type GraphResponse struct {
 var ServicesResource = mcp.NewResource(
 	"services://list",
 	"Services",
-	mcp.WithResourceDescription("List of available services in the organization."),
+	mcp.WithResourceDescription(`List of available service names in the organization.
+Services can be used to filter logs, metrics, traces, patterns, and events using the service.name field.`),
 	mcp.WithMIMEType("application/json"),
 )
 
@@ -109,7 +115,13 @@ func ServicesResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get services: %w", err)
 		}
 
-		result, err := json.Marshal(services)
+		response := ServicesResourceResponse{
+			Services: services,
+			UsageNotes: `Use facet_options tool to verify a service name if not in this list.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal services: %w", err)
 		}

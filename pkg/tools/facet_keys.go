@@ -15,38 +15,49 @@ type FacetKey struct {
 	Key string `json:"key"`
 }
 
+type FacetKeysResourceResponse struct {
+	Scope      string     `json:"scope"`
+	FacetKeys  []FacetKey `json:"facet_keys"`
+	UsageNotes string     `json:"usage_notes"`
+}
+
 var LogFacetKeysResource = mcp.NewResource(
 	"facet-keys://logs",
 	"Log Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for logs."),
+	mcp.WithResourceDescription(`Available field names for filtering logs.
+Common fields: service.name, severity_text, host.name, ed.tag, k8s.pod.name.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var MetricFacetKeysResource = mcp.NewResource(
 	"facet-keys://metrics",
 	"Metric Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for metrics."),
+	mcp.WithResourceDescription(`Available field names for filtering metrics.
+Common fields: name (metric name), service.name, host.name, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var TraceFacetKeysResource = mcp.NewResource(
 	"facet-keys://traces",
 	"Trace Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for traces."),
+	mcp.WithResourceDescription(`Available field names for filtering traces.
+Common fields: service.name, status.code, span.kind, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var PatternFacetKeysResource = mcp.NewResource(
 	"facet-keys://patterns",
 	"Pattern Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for patterns."),
+	mcp.WithResourceDescription(`Available field names for filtering log patterns.
+Common fields: service.name, host.name, ed.tag.`),
 	mcp.WithMIMEType("application/json"),
 )
 
 var EventFacetKeysResource = mcp.NewResource(
 	"facet-keys://events",
 	"Event Facet Keys",
-	mcp.WithResourceDescription("List of available facet keys for events."),
+	mcp.WithResourceDescription(`Available field names for filtering events (alerts, anomalies).
+Common fields: event.type, event.domain, service.name, ed.monitor.type.`),
 	mcp.WithMIMEType("application/json"),
 )
 
@@ -108,7 +119,14 @@ func LogFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get log facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "log",
+			FacetKeys: facetKeys,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal log facet keys: %w", err)
 		}
@@ -130,7 +148,15 @@ func MetricFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get metric facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "metric",
+			FacetKeys: facetKeys,
+			UsageNotes: `Use search_metrics tool for fuzzy metric name discovery.
+Use facet_options tool to get values for any field.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal metric facet keys: %w", err)
 		}
@@ -152,7 +178,14 @@ func TraceFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get trace facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "trace",
+			FacetKeys: facetKeys,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal trace facet keys: %w", err)
 		}
@@ -174,7 +207,14 @@ func PatternFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get pattern facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "pattern",
+			FacetKeys: facetKeys,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal pattern facet keys: %w", err)
 		}
@@ -196,7 +236,14 @@ func EventFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			return nil, fmt.Errorf("failed to get event facet keys: %w", err)
 		}
 
-		result, err := json.Marshal(facetKeys)
+		response := FacetKeysResourceResponse{
+			Scope:     "event",
+			FacetKeys: facetKeys,
+			UsageNotes: `Use facet_options tool to get values for any field.
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
+		}
+
+		result, err := json.Marshal(response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal event facet keys: %w", err)
 		}

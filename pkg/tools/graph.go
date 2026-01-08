@@ -15,16 +15,85 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+type GraphToolResponse struct {
+	Data     json.RawMessage `json:"data"`
+	Query    string          `json:"query_used,omitempty"`
+	Guidance *GraphGuidance  `json:"guidance,omitempty"`
+}
+
+type GraphGuidance struct {
+	ResultStatus string   `json:"result_status"`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+}
+
+func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, error) {
+	var graphResp GraphResponse
+	hasData := false
+
+	if err := json.Unmarshal(bodyBytes, &graphResp); err == nil {
+		hasData = len(graphResp.Records) > 0
+	}
+
+	response := GraphToolResponse{
+		Data:  bodyBytes,
+		Query: query,
+	}
+
+	if !hasData {
+		response.Guidance = &GraphGuidance{
+			ResultStatus: "empty",
+			NextSteps: []string{
+				fmt.Sprintf("No data found for query: %s", query),
+				"This is a valid signal - no data exists for this time range or filter.",
+			},
+			Suggestions: []string{
+				"Verify field values with facet_options tool to ensure the values exist in your data",
+				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
+				"Simplify the query by removing filters one at a time",
+				"Use validate_cql tool to check your query syntax, or build_cql tool to reconstruct from structured parameters",
+			},
+		}
+	} else {
+		response.Guidance = &GraphGuidance{
+			ResultStatus: "success",
+			NextSteps: []string{
+				"Graph data retrieved successfully.",
+				"To refine results, adjust filters using facet_options tool to see available values.",
+			},
+		}
+	}
+
+	result, _ := json.Marshal(response)
+	return mcp.NewToolResultText(string(result)), nil
+}
+
 // GetLogGraphTool creates a tool to render a graph from logs
 func GetLogGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_graph",
-			mcp.WithDescription(`Render a graph from logs`),
+			mcp.WithTitleAnnotation("Get Log Graph"),
+			mcp.WithDescription(`Render a time series graph of log counts.
+
+IMPORTANT: Call discover_schema tool with scope:"log" first to see available fields.
+
+CQL Syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+- Boolean: term1 AND term2
+- Full-text search: just type words without field prefix (supported)
+
+NOT SUPPORTED: Regular expressions (/pattern/)
+
+Common fields: service.name, severity_text, host.name, ed.tag
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
-				mcp.Description(`Log facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://logs" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")
-Default is "*" to include all logs`),
+				mcp.Description(`CQL filter query. Examples:
+- service.name:"api" AND severity_text:"ERROR"
+- ed.tag:"prod" AND -severity_text:"DEBUG"
+- service.name:("api" OR "web")
+Use "*" for all logs. Verify fields with discover_schema tool first.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
 			),
@@ -48,7 +117,7 @@ Default is "*" to include all logs`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -135,33 +204,50 @@ Default is "*" to include all logs`),
 				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
 // GetMetricGraphTool creates a tool to render a graph from metrics
 func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_graph",
-			mcp.WithDescription(`Render a graph from metrics`),
+			mcp.WithTitleAnnotation("Get Metric Graph"),
+			mcp.WithDescription(`Render a time series graph for a metric.
+
+IMPORTANT: Before using:
+1. Use search_metrics tool to find the exact metric name (fuzzy search)
+2. Or use facet_options tool with scope:"metric" and facet_path:"name"
+
+Metric names must be EXACT - no wildcards or regex.
+
+CQL filter syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+
+NOT SUPPORTED for metrics:
+- Full-text search (queries without field: prefix) - will cause error
+- Regular expressions (/pattern/)
+
+If empty results: verify metric name and filter values`),
 			mcp.WithString("metric_name",
-				mcp.Description(`Metric name that will be used for constructing the graph. Wildcards and regexes are not supported, it should be a plain name. For available metric names, please use "facet_options" tool with "metric" scope and "name" facet path.`),
+				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics tool first. Examples: "http.request.duration", "system.cpu.usage". NO wildcards.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
-				mcp.Description(`Aggregation method that will apply while obtaining the result as metrics gets rolled up. "sum", "median", "count", "avg" (for average), "max" (for maximum) and "min" (for minimum) are the valid options`),
+				mcp.Description(`Aggregation method: "sum", "median", "count", "avg", "max", "min"`),
 				mcp.DefaultString("sum"),
 				mcp.Required(),
 			),
 			mcp.WithString("filter_query",
-				mcp.Description(`Metric facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://metrics" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")
-Default is "*" to include all metrics`),
+				mcp.Description(`CQL filter query. Examples:
+- service.name:"api"
+- service.name:("api" OR "web") AND ed.tag:"prod"
+Use "*" for no filter. Verify field values with facet_options.`),
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys that will be used for constructing the graph. One can refer "facet-keys://metrics" resource for available keys.`),
+				mcp.Description(`Grouping keys for the graph. Use discover_schema tool with scope:"metric" or facet_options tool to see available keys. Common keys: service.name, host.name, ed.tag`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
@@ -187,7 +273,7 @@ Default is "*" to include all metrics`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -303,23 +389,40 @@ Default is "*" to include all metrics`),
 			}
 
 			if resp.StatusCode != http.StatusMultiStatus {
-				return nil, fmt.Errorf("failed to search logs, status code %d: %s", resp.StatusCode, string(bodyBytes))
+				return nil, fmt.Errorf("failed to search metrics, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			return formatGraphResponse(bodyBytes, cql)
 		}
 }
 
 // GetTraceGraphTool creates a tool to render a graph from traces
 func GetTraceGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_graph",
-			mcp.WithDescription(`Render a graph from traces`),
+			mcp.WithTitleAnnotation("Get Trace Graph"),
+			mcp.WithDescription(`Render a time series graph from traces.
+
+IMPORTANT: Call discover_schema tool with scope:"trace" first to see available fields.
+
+CQL Syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+
+NOT SUPPORTED for traces:
+- Full-text search (queries without field: prefix) - will cause error
+- Regular expressions (/pattern/)
+
+Common fields: service.name, status.code, span.kind, ed.tag
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
-				mcp.Description(`Trace facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://traces" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")
-Default is "*" to include all traces`),
+				mcp.Description(`CQL filter query (field:value syntax required). Examples:
+- service.name:"api"
+- ed.tag:"prod" AND status.code:"ERROR"
+- span.kind:"server" AND service.name:("api" OR "web")
+Use "*" for all traces. Verify fields with discover_schema tool first.
+NOTE: Full-text search is NOT supported for traces.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
 			),
@@ -352,7 +455,7 @@ Default is "*" to include all traces`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -452,20 +555,37 @@ Default is "*" to include all traces`),
 				return nil, fmt.Errorf("failed to graph traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
 // GetPatternGraphTool creates a tool to render a graph from patterns
 func GetPatternGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pattern_graph",
-			mcp.WithDescription(`Render a graph from patterns`),
+			mcp.WithTitleAnnotation("Get Pattern Graph"),
+			mcp.WithDescription(`Render a time series graph of log pattern counts.
+
+IMPORTANT: Call discover_schema tool with scope:"pattern" first to see available fields.
+
+CQL Syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+- Full-text search: supported (e.g., "error OR timeout")
+
+NOT SUPPORTED: Regular expressions (/pattern/)
+
+Common fields: service.name, host.name, ed.tag
+
+Note: Sentiment filtering is done via include_negative_patterns parameter, not CQL.
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
-				mcp.Description(`Pattern facets are to target in the tool. service.name is one of the keys, you must get "services://list" resource before setting service.name, if you don't set it, it is for all services. Keys are anded together and values in the keys are ORed. You can also mix and match with use other keys via using "facet-keys://patterns" resource. Examples;
-service.name:"ingestor"
-ed.tag:"prod" AND -host.name:"server1.mydomain.com"
-service.name:("api" OR "web")
-Default is "*" to include all patterns`),
+				mcp.Description(`CQL filter query. Examples:
+- service.name:"api"
+- ed.tag:"prod" AND host.name:"server1"
+- service.name:("api" OR "web")
+Use "*" for all patterns. Verify fields with discover_schema tool first.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
 			),
@@ -509,7 +629,7 @@ Default is "*" to include all patterns`),
 				mcp.DefaultString("desc"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -541,7 +661,7 @@ Default is "*" to include all patterns`),
 				includeNegativePatterns = true
 			}
 
-			if incMissingUnderOther, _ := params.Optional[bool](request, "include_negative_patterns"); incMissingUnderOther {
+			if incMissingUnderOther, _ := params.Optional[bool](request, "include_missing_under_other"); incMissingUnderOther {
 				includeMissingUnderOther = true
 			}
 
@@ -626,16 +746,37 @@ Default is "*" to include all patterns`),
 				return nil, fmt.Errorf("failed to graph patterns, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			return formatGraphResponse(bodyBytes, query)
 		}
 }
 
 // GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
 func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_timeline",
-			mcp.WithDescription(`Fetch spans (OTel) for a timeline view using trace facet queries. Combine facets to narrow results; different keys are ANDed, values within a key are ORed. Use "facet-keys://traces" to discover available keys and "services://list" to discover service names.`),
+			mcp.WithTitleAnnotation("Get Trace Timeline"),
+			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
+
+IMPORTANT: Call discover_schema tool with scope:"trace" first to see available fields.
+
+CQL Syntax:
+- Field equals: field:"value"
+- Multiple values: field:("val1" OR "val2")
+- Negation: -field:"value"
+
+NOT SUPPORTED for traces:
+- Full-text search (queries without field: prefix) - will cause error
+- Regular expressions (/pattern/)
+
+Common fields: service.name, status.code, span.kind, ed.tag
+
+If empty results: verify field values with facet_options`),
 			mcp.WithString("query",
-				mcp.Description(`Trace facet query. Examples:\nservice.name:"api"\n'span.name':"GET /checkout"\nstatus.code:"ERROR"\nservice.name:("api" OR "web")\n-attributes.http.route:"/healthz"`),
+				mcp.Description(`CQL filter query (field:value syntax required). Examples:
+- service.name:"api"
+- span.kind:"server"
+- status.code:"ERROR"
+- ed.tag:"prod" AND service.name:("api" OR "web")
+NOTE: Full-text search is NOT supported for traces.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -666,7 +807,7 @@ func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHand
 				mcp.Description("If true, include child spans for matched spans to provide full trace context."),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -683,7 +824,9 @@ func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			}
 
 			queryParams := tracesURL.Query()
-			if query, _ := params.Optional[string](request, "query"); query != "" {
+			var query string
+			if q, _ := params.Optional[string](request, "query"); q != "" {
+				query = q
 				queryParams.Add("query", query)
 			}
 
@@ -741,6 +884,6 @@ func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHand
 				return nil, fmt.Errorf("failed to search traces, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			return formatGraphResponse(bodyBytes, query)
 		}
 }

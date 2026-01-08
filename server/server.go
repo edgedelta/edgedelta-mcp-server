@@ -47,20 +47,35 @@ func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerO
 }
 
 func AddCustomTools(s *server.MCPServer, client tools.Client) {
+	// Discovery and query building tools
+	s.AddTool(tools.GetDiscoverSchemaTool(client))
+	s.AddTool(tools.GetSearchMetricsTool(client))
+	s.AddTool(tools.GetValidateCQLTool())
+	s.AddTool(tools.GetBuildCQLTool(client))
+
+	// Pipeline management tools
 	s.AddTool(tools.GetPipelinesTool(client))
 	s.AddTool(tools.GetPipelineConfigTool(client))
 	s.AddTool(tools.GetPipelineHistoryTool(client))
 	s.AddTool(tools.DeployPipelineTool(client))
 	s.AddTool(tools.AddPipelineSourceTool(client))
+
+	// Facet tools
 	s.AddTool(tools.FacetsTool, tools.FacetsToolHandler(client))
 	s.AddTool(tools.FacetOptionsTool, tools.FacetOptionsToolHandler(client))
+
+	// Search tools
 	s.AddTool(tools.GetLogSearchTool(client))
 	s.AddTool(tools.GetTraceTimelineTool(client))
 	s.AddTool(tools.GetMetricSearchTool(client))
 	s.AddTool(tools.GetEventSearchTool(client))
 	s.AddTool(tools.GetLogPatternsTool(client))
+
+	// Dashboard tools
 	s.AddTool(tools.GetAllDashboardsTool(client))
 	s.AddTool(tools.GetDashboardTool(client))
+
+	// Graph/visualization tools
 	s.AddTool(tools.GetLogGraphTool(client))
 	s.AddTool(tools.GetMetricGraphTool(client))
 	s.AddTool(tools.GetTraceGraphTool(client))
@@ -68,8 +83,11 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 }
 
 func AddCustomResources(s *server.MCPServer, client tools.Client) {
+	// Facet resources
 	s.AddResourceTemplate(tools.FacetsResource, tools.FacetsResourceHandler(client))
 	s.AddResourceTemplate(tools.FacetOptionsResource, tools.FacetOptionsResourceHandler(client))
+
+	// Data resources
 	s.AddResource(tools.ServicesResource, tools.ServicesResourceHandler(client))
 	s.AddResource(tools.LogFacetKeysResource, tools.LogFacetKeysResourceHandler(client))
 	s.AddResource(tools.MetricFacetKeysResource, tools.MetricFacetKeysResourceHandler(client))

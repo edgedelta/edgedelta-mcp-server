@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,15 +13,33 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+type DashboardToolResponse struct {
+	Data     json.RawMessage    `json:"data"`
+	Guidance *DashboardGuidance `json:"guidance,omitempty"`
+}
+
+type DashboardGuidance struct {
+	ResultStatus string   `json:"result_status"`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
+}
+
 // GetAllDashboardsTool creates a tool to get all dashboards
 func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_all_dashboards",
-			mcp.WithDescription("Returns all dashboards of users in the org."),
+			mcp.WithTitleAnnotation("Get All Dashboards"),
+			mcp.WithDescription(`List all dashboards in the organization.
+
+WORKFLOW: This is the entry point for dashboard operations.
+1. get_all_dashboards → list dashboards with their dashboard_id
+2. get_dashboard(dashboard_id) → get detailed dashboard configuration
+
+Returns dashboard summaries. Use include_definitions:true for full widget definitions.`),
 			mcp.WithBoolean("include_definitions",
 				mcp.Description("Include definitions in the response"),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -64,20 +83,42 @@ func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHand
 				return nil, fmt.Errorf("failed to get dashboards, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			// Wrap with guidance
+			response := DashboardToolResponse{
+				Data: bodyBytes,
+				Guidance: &DashboardGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"Use get_dashboard tool with dashboard_id to get detailed information for a specific dashboard.",
+						"Dashboard IDs can be found in the response above.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(r)), nil
 		}
 }
 
 // GetDashboardTool creates a tool to get a specific dashboard
 func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_dashboard",
-			mcp.WithDescription("Returns the dashboard for the given ID."),
+			mcp.WithTitleAnnotation("Get Dashboard"),
+			mcp.WithDescription(`Get detailed configuration for a specific dashboard.
+
+PREREQUISITE: Call get_all_dashboards tool first to obtain the dashboard_id.
+
+Returns full dashboard configuration including widget definitions and layout.`),
 			mcp.WithString("dashboard_id",
 				mcp.Description("Dashboard ID"),
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
@@ -116,6 +157,23 @@ func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 				return nil, fmt.Errorf("failed to get dashboard, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
-			return mcp.NewToolResultText(string(bodyBytes)), nil
+			// Wrap with guidance
+			response := DashboardToolResponse{
+				Data: bodyBytes,
+				Guidance: &DashboardGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"Dashboard details retrieved successfully.",
+						"Use get_all_dashboards tool to see other available dashboards.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(r)), nil
 		}
 }
