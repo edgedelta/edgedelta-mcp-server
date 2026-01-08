@@ -123,7 +123,7 @@ func LogFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			Scope:     "log",
 			FacetKeys: facetKeys,
 			UsageNotes: `Use facet_options tool to get values for any field.
-Use build_cql to construct queries or validate_cql to check syntax.`,
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -153,7 +153,7 @@ func MetricFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			FacetKeys: facetKeys,
 			UsageNotes: `Use search_metrics tool for fuzzy metric name discovery.
 Use facet_options tool to get values for any field.
-Use build_cql to construct queries or validate_cql to check syntax.`,
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -182,7 +182,7 @@ func TraceFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			Scope:     "trace",
 			FacetKeys: facetKeys,
 			UsageNotes: `Use facet_options tool to get values for any field.
-Use build_cql to construct queries or validate_cql to check syntax.`,
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -211,7 +211,7 @@ func PatternFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			Scope:     "pattern",
 			FacetKeys: facetKeys,
 			UsageNotes: `Use facet_options tool to get values for any field.
-Use build_cql to construct queries or validate_cql to check syntax.`,
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
 		}
 
 		result, err := json.Marshal(response)
@@ -240,7 +240,7 @@ func EventFacetKeysResourceHandler(client Client) server.ResourceHandlerFunc {
 			Scope:     "event",
 			FacetKeys: facetKeys,
 			UsageNotes: `Use facet_options tool to get values for any field.
-Use build_cql to construct queries or validate_cql to check syntax.`,
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`,
 		}
 
 		result, err := json.Marshal(response)

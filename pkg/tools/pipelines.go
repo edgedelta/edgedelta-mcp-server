@@ -120,8 +120,8 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Use get_pipeline_config with conf_id to get detailed configuration for a specific pipeline.",
-						"Use get_pipeline_history with conf_id to see configuration change history.",
+						"Use get_pipeline_config tool with conf_id to get detailed configuration for a specific pipeline.",
+						"Use get_pipeline_history tool with conf_id to see configuration change history.",
 					},
 				},
 			}
@@ -141,7 +141,7 @@ func GetPipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHan
 			mcp.WithTitleAnnotation("Get Pipeline Config"),
 			mcp.WithDescription(`Get detailed configuration for a specific pipeline.
 
-PREREQUISITE: Call get_pipelines first to obtain the conf_id.
+PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.
 
 Returns the full pipeline configuration including:
 - Config content (YAML/JSON)
@@ -149,9 +149,9 @@ Returns the full pipeline configuration including:
 - Pipeline metadata
 
 After viewing config, you can:
-- Use get_pipeline_history to see version history
-- Use add_pipeline_source to add data sources
-- Use deploy_pipeline to deploy changes`),
+- Use get_pipeline_history tool to see version history
+- Use add_pipeline_source tool to add data sources
+- Use deploy_pipeline tool to deploy changes`),
 			mcp.WithString("conf_id",
 				mcp.Description("Config ID of the pipeline. Get this from get_pipelines response."),
 				mcp.Required(),
@@ -202,9 +202,9 @@ After viewing config, you can:
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Use get_pipeline_history to see the configuration change history.",
-						"Use deploy_pipeline to deploy the pipeline after making changes.",
-						"Use add_pipeline_source to add new data sources to the pipeline.",
+						"Use get_pipeline_history tool to see the configuration change history.",
+						"Use deploy_pipeline tool to deploy the pipeline after making changes.",
+						"Use add_pipeline_source tool to add new data sources to the pipeline.",
 					},
 				},
 			}
@@ -224,9 +224,9 @@ func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHa
 			mcp.WithTitleAnnotation("Get Pipeline History"),
 			mcp.WithDescription(`Get version history for a pipeline configuration.
 
-PREREQUISITE: Call get_pipelines first to obtain the conf_id.
+PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.
 
-REQUIRED FOR DEPLOYMENT: The version (timestamp field) from history is required when calling deploy_pipeline.
+REQUIRED FOR DEPLOYMENT: The version (timestamp field) from history is required when calling deploy_pipeline tool.
 
 Returns history entries with timestamps that serve as version identifiers.
 
@@ -283,7 +283,7 @@ Workflow for deployment:
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Use deploy_pipeline with conf_id and version (timestamp field from history) to deploy a specific version.",
+						"Use deploy_pipeline tool with conf_id and version (timestamp field from history) to deploy a specific version.",
 						"The version parameter should be the timestamp from the most recent history entry.",
 					},
 				},
@@ -320,7 +320,7 @@ Workflow example:
 				mcp.Required(),
 			),
 			mcp.WithString("version",
-				mcp.Description("Version uses the timestamp field from pipeline history in milliseconds format. Example: 1752190141312. This is the timestamp field of the most recent element in the result of get_pipeline_history. Call get_pipeline_history first to get the latest version."),
+				mcp.Description("Version uses the timestamp field from pipeline history in milliseconds format. Example: 1752190141312. This is the timestamp field of the most recent element in the result of get_pipeline_history tool. Call get_pipeline_history tool first to get the latest version."),
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(false),
@@ -375,7 +375,7 @@ Workflow example:
 					ResultStatus: "success",
 					NextSteps: []string{
 						"Pipeline deployment initiated successfully.",
-						"Use get_pipeline_config to verify the deployed configuration.",
+						"Use get_pipeline_config tool to verify the deployed configuration.",
 						"Monitor pipeline status to ensure successful deployment.",
 					},
 				},
@@ -394,13 +394,13 @@ Workflow example:
 func AddPipelineSourceTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	description := `Adds a data source node to a pipeline configuration.
 
-PREREQUISITE: Call get_pipelines first to obtain the conf_id.
+PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.
 
 This tool SAVES the configuration but does NOT deploy it.
 After adding source, you must deploy to apply changes:
-1. add_pipeline_source(conf_id, node) → saves configuration
-2. get_pipeline_history(conf_id) → get new version timestamp
-3. deploy_pipeline(conf_id, version) → deploy the changes
+1. add_pipeline_source tool (conf_id, node) → saves configuration
+2. get_pipeline_history tool (conf_id) → get new version timestamp
+3. deploy_pipeline tool (conf_id, version) → deploy the changes
 
 Example node configurations:
 
@@ -524,8 +524,8 @@ Example node configurations:
 					ResultStatus: "success",
 					NextSteps: []string{
 						"Source added and configuration saved (not yet deployed).",
-						"Use get_pipeline_history to get the latest version timestamp.",
-						"Use deploy_pipeline with the version to deploy the updated configuration.",
+						"Use get_pipeline_history tool to get the latest version timestamp.",
+						"Use deploy_pipeline tool with the version to deploy the updated configuration.",
 					},
 				},
 			}
@@ -537,11 +537,4 @@ Example node configurations:
 
 			return mcp.NewToolResultText(string(r)), nil
 		}
-}
-
-func getNumber(s string) (int, bool) {
-	if i, err := strconv.Atoi(s); err == nil {
-		return i, true
-	}
-	return 0, false
 }

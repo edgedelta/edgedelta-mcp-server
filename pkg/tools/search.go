@@ -34,7 +34,7 @@ func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			mcp.WithTitleAnnotation("Search Logs"),
 			mcp.WithDescription(`Search logs using CQL (Common Query Language).
 
-IMPORTANT: Call discover_schema with scope:"log" first to see available fields and values.
+IMPORTANT: Call discover_schema tool with scope:"log" first to see available fields and values.
 
 CQL Syntax:
 - Field equals: field:"value"
@@ -53,7 +53,7 @@ If empty results: verify field values with facet_options`),
 - service.name:("api" OR "web") AND -severity_text:"DEBUG"
 - @response.code > 400
 - error OR exception (full-text search)
-Use discover_schema or facet_options first to verify field names.`),
+Use discover_schema tool or facet_options tool first to verify field names.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -190,10 +190,10 @@ func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, 
 				"This is a valid signal - the data may not exist for this time range or filter.",
 			},
 			Suggestions: []string{
-				"Verify field values with facet_options to ensure the values exist in your data",
+				"Verify field values with facet_options tool to ensure the values exist in your data",
 				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
 				"Simplify the query by removing filters one at a time",
-				"Use validate_cql to check if your query syntax is correct",
+				"Use validate_cql tool to check your query syntax, or build_cql tool to reconstruct from structured parameters",
 			},
 		}
 	} else {
@@ -216,8 +216,8 @@ func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandl
 			mcp.WithDescription(`Search and aggregate metrics.
 
 IMPORTANT: Before using this tool:
-1. Use search_metrics to find the exact metric name (fuzzy search supported)
-2. Or use facet_options with scope:"metric" and facet_path:"name" for exact names
+1. Use search_metrics tool to find the exact metric name (fuzzy search supported)
+2. Or use facet_options tool with scope:"metric" and facet_path:"name" for exact names
 
 Metric names must be EXACT - no wildcards or regex allowed.
 
@@ -232,7 +232,7 @@ NOT SUPPORTED for metrics:
 
 If empty results: verify metric name with search_metrics and filter values with facet_options`),
 			mcp.WithString("metric_name",
-				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics first to find available metric names. Examples: "http.request.duration", "system.cpu.usage". NO wildcards or regex.`),
+				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics tool first to find available metric names. Examples: "http.request.duration", "system.cpu.usage". NO wildcards or regex.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
@@ -248,7 +248,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys for the metric search. Use discover_schema with scope:"metric" or facet_options to see available keys. Common keys: service.name, host.name, ed.tag`),
+				mcp.Description(`Grouping keys for the metric search. Use discover_schema tool with scope:"metric" or facet_options tool to see available keys. Common keys: service.name, host.name, ed.tag`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
@@ -411,7 +411,7 @@ func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 			mcp.WithTitleAnnotation("Search Events"),
 			mcp.WithDescription(`Search events (anomalies, alerts, kubernetes events) using CQL.
 
-IMPORTANT: Call discover_schema with scope:"event" first to see available event types and domains.
+IMPORTANT: Call discover_schema tool with scope:"event" first to see available event types and domains.
 
 Common event queries:
 - event.type:"pattern_anomaly" - Log anomaly detections
@@ -434,7 +434,7 @@ If empty results: verify event.type/event.domain values with facet_options`),
 - event.type:"pattern_anomaly" (all anomalies)
 - service.name:"api" AND event.type:"pattern_anomaly"
 - event.domain:"Monitor Alerts"
-Use discover_schema or facet_options to verify field values.`),
+Use discover_schema tool or facet_options tool to verify field values.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",
@@ -547,7 +547,7 @@ func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 
 Returns pattern clusters with: count, proportion, sentiment (positive/negative/neutral), and delta (change over time).
 
-IMPORTANT: Call discover_schema with scope:"pattern" first to see available fields.
+IMPORTANT: Call discover_schema tool with scope:"pattern" first to see available fields.
 
 CQL Syntax for query:
 - Field equals: field:"value"
@@ -566,7 +566,7 @@ If empty results: verify field values with facet_options`),
 				mcp.Description(`CQL filter query. Examples:
 - service.name:"api" (patterns from api service)
 - service.name:("api" OR "web") AND ed.tag:"prod"
-Use discover_schema or facet_options to verify field values.`),
+Use discover_schema tool or facet_options tool to verify field values.`),
 				mcp.DefaultString(""),
 			),
 			mcp.WithString("lookback",

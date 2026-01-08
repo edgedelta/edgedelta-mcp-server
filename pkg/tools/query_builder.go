@@ -261,7 +261,7 @@ func validateCQL(query, scope string) CQLValidationResult {
 				}
 				if !isKnown && !strings.HasPrefix(fieldName, "@") {
 					result.Warnings = append(result.Warnings,
-						fmt.Sprintf("Field '%s' is not a commonly known facet for scope '%s'. Use facet_options to verify this field exists.", fieldName, scope))
+						fmt.Sprintf("Field '%s' is not a commonly known facet for scope '%s'. Use facet_options tool to verify this field exists.", fieldName, scope))
 				}
 			}
 		}
@@ -277,7 +277,7 @@ func validateCQL(query, scope string) CQLValidationResult {
 			ResultStatus: "valid",
 			NextSteps: []string{
 				fmt.Sprintf("Query is valid. Use it in get_%s_search or get_%s_graph tool.", getScopeSearchType(scope), getScopeSearchType(scope)),
-				"If you get empty results, use facet_options to verify field values exist in your data.",
+				"If you get empty results, use facet_options tool to verify field values exist in your data.",
 			},
 		}
 	} else {
@@ -375,7 +375,7 @@ func buildCQL(scope string, filters map[string]any) CQLBuildResult {
 	// Wrap with guidance and suggestions
 	if len(result.UnknownFields) > 0 {
 		result.Suggestions = append(result.Suggestions,
-			fmt.Sprintf("Unknown fields detected: %v. Use facet_options to verify field names exist for scope '%s'.",
+			fmt.Sprintf("Unknown fields detected: %v. Use facet_options tool to verify field names exist for scope '%s'.",
 				result.UnknownFields, scope))
 	}
 
@@ -383,7 +383,7 @@ func buildCQL(scope string, filters map[string]any) CQLBuildResult {
 		ResultStatus: "success",
 		NextSteps: []string{
 			fmt.Sprintf("Use the query in get_%s_search or get_%s_graph tool.", getScopeSearchType(scope), getScopeSearchType(scope)),
-			"Use facet_options to verify the field values you're filtering on actually exist in your data.",
+			"Use facet_options tool to verify the field values you're filtering on actually exist in your data.",
 		},
 	}
 

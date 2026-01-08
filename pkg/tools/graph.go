@@ -48,10 +48,10 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 				"This is a valid signal - no data exists for this time range or filter.",
 			},
 			Suggestions: []string{
-				"Verify field values with facet_options to ensure the values exist in your data",
+				"Verify field values with facet_options tool to ensure the values exist in your data",
 				"Try a broader time range (e.g., lookback:\"24h\" or lookback:\"7d\")",
 				"Simplify the query by removing filters one at a time",
-				"Use validate_cql to check if your query syntax is correct",
+				"Use validate_cql tool to check your query syntax, or build_cql tool to reconstruct from structured parameters",
 			},
 		}
 	} else {
@@ -59,7 +59,7 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 			ResultStatus: "success",
 			NextSteps: []string{
 				"Graph data retrieved successfully.",
-				"To refine results, adjust filters using facet_options to see available values.",
+				"To refine results, adjust filters using facet_options tool to see available values.",
 			},
 		}
 	}
@@ -74,7 +74,7 @@ func GetLogGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFu
 			mcp.WithTitleAnnotation("Get Log Graph"),
 			mcp.WithDescription(`Render a time series graph of log counts.
 
-IMPORTANT: Call discover_schema with scope:"log" first to see available fields.
+IMPORTANT: Call discover_schema tool with scope:"log" first to see available fields.
 
 CQL Syntax:
 - Field equals: field:"value"
@@ -93,7 +93,7 @@ If empty results: verify field values with facet_options`),
 - service.name:"api" AND severity_text:"ERROR"
 - ed.tag:"prod" AND -severity_text:"DEBUG"
 - service.name:("api" OR "web")
-Use "*" for all logs. Verify fields with discover_schema first.`),
+Use "*" for all logs. Verify fields with discover_schema tool first.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
 			),
@@ -215,8 +215,8 @@ func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandle
 			mcp.WithDescription(`Render a time series graph for a metric.
 
 IMPORTANT: Before using:
-1. Use search_metrics to find the exact metric name (fuzzy search)
-2. Or use facet_options with scope:"metric" and facet_path:"name"
+1. Use search_metrics tool to find the exact metric name (fuzzy search)
+2. Or use facet_options tool with scope:"metric" and facet_path:"name"
 
 Metric names must be EXACT - no wildcards or regex.
 
@@ -231,7 +231,7 @@ NOT SUPPORTED for metrics:
 
 If empty results: verify metric name and filter values`),
 			mcp.WithString("metric_name",
-				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics first. Examples: "http.request.duration", "system.cpu.usage". NO wildcards.`),
+				mcp.Description(`EXACT metric name (case-sensitive). Use search_metrics tool first. Examples: "http.request.duration", "system.cpu.usage". NO wildcards.`),
 				mcp.Required(),
 			),
 			mcp.WithString("aggregation_method",
@@ -247,7 +247,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 				mcp.DefaultString("*"),
 			),
 			mcp.WithArray("group_by_keys",
-				mcp.Description(`Grouping keys for the graph. Use discover_schema with scope:"metric" or facet_options to see available keys. Common keys: service.name, host.name, ed.tag`),
+				mcp.Description(`Grouping keys for the graph. Use discover_schema tool with scope:"metric" or facet_options tool to see available keys. Common keys: service.name, host.name, ed.tag`),
 				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("rollup_period",
@@ -402,7 +402,7 @@ func GetTraceGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandler
 			mcp.WithTitleAnnotation("Get Trace Graph"),
 			mcp.WithDescription(`Render a time series graph from traces.
 
-IMPORTANT: Call discover_schema with scope:"trace" first to see available fields.
+IMPORTANT: Call discover_schema tool with scope:"trace" first to see available fields.
 
 CQL Syntax:
 - Field equals: field:"value"
@@ -421,7 +421,7 @@ If empty results: verify field values with facet_options`),
 - service.name:"api"
 - ed.tag:"prod" AND status.code:"ERROR"
 - span.kind:"server" AND service.name:("api" OR "web")
-Use "*" for all traces. Verify fields with discover_schema first.
+Use "*" for all traces. Verify fields with discover_schema tool first.
 NOTE: Full-text search is NOT supported for traces.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
@@ -565,7 +565,7 @@ func GetPatternGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandl
 			mcp.WithTitleAnnotation("Get Pattern Graph"),
 			mcp.WithDescription(`Render a time series graph of log pattern counts.
 
-IMPORTANT: Call discover_schema with scope:"pattern" first to see available fields.
+IMPORTANT: Call discover_schema tool with scope:"pattern" first to see available fields.
 
 CQL Syntax:
 - Field equals: field:"value"
@@ -585,7 +585,7 @@ If empty results: verify field values with facet_options`),
 - service.name:"api"
 - ed.tag:"prod" AND host.name:"server1"
 - service.name:("api" OR "web")
-Use "*" for all patterns. Verify fields with discover_schema first.`),
+Use "*" for all patterns. Verify fields with discover_schema tool first.`),
 				mcp.DefaultString("*"),
 				mcp.Required(),
 			),
@@ -756,7 +756,7 @@ func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			mcp.WithTitleAnnotation("Get Trace Timeline"),
 			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
 
-IMPORTANT: Call discover_schema with scope:"trace" first to see available fields.
+IMPORTANT: Call discover_schema tool with scope:"trace" first to see available fields.
 
 CQL Syntax:
 - Field equals: field:"value"

@@ -141,10 +141,10 @@ To get values for fields NOT in common_fields, call facet_options tool.
 Use the returned information to:
 1. Know which fields are available for filtering (facet_keys)
 2. See sample values for common fields (common_fields)
-3. Call facet_options for any other field values you need
+3. Call facet_options tool for any other field values you need
 4. Construct valid CQL queries
 
-After calling this tool, use validate_cql or build_cql to construct your query.`),
+After calling this tool, use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`),
 			mcp.WithString("scope",
 				mcp.Description("Search scope: 'log', 'metric', 'trace', 'pattern', 'event'"),
 				mcp.Required(),
@@ -225,10 +225,10 @@ After calling this tool, use validate_cql or build_cql to construct your query.`
 				result.Guidance = &DiscoveryGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Use validate_cql tool to check your query syntax before executing",
-						"Use build_cql tool to construct queries from structured parameters",
+						"Use build_cql tool to construct queries from structured parameters (recommended for new queries)",
+						"Use validate_cql tool to check existing query syntax before executing",
 						"Use facet_options tool to get values for fields NOT listed in common_fields above",
-						"Note: common_fields only contains a subset of fields - use facet_options for other fields from facet_keys",
+						"Note: common_fields only contains a subset of fields - use facet_options tool for other fields from facet_keys",
 					},
 				}
 			}
@@ -244,7 +244,7 @@ func GetSearchMetricsTool(client Client) (tool mcp.Tool, handler server.ToolHand
 			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Searches for metric names using fuzzy/partial matching.
 
-Use this tool BEFORE get_metric_search or get_metric_graph when you don't know the exact metric name.
+Use this tool BEFORE get_metric_search tool or get_metric_graph tool when you don't know the exact metric name.
 
 Examples:
 - search_metrics(pattern: "cpu") -> finds "system.cpu.usage", "container.cpu.percent"
@@ -252,7 +252,7 @@ Examples:
 - search_metrics(pattern: "error") -> finds metrics containing "error"
 
 Returns matching metric names ranked by relevance.
-Use the exact metric name from results in get_metric_search or get_metric_graph.`),
+Use the exact metric name from results in get_metric_search tool or get_metric_graph tool.`),
 			mcp.WithString("pattern",
 				mcp.Description("Partial metric name or keywords to search for. Case-insensitive."),
 				mcp.Required(),
@@ -305,7 +305,7 @@ Use the exact metric name from results in get_metric_search or get_metric_graph.
 					ResultStatus: "success",
 					NextSteps: []string{
 						fmt.Sprintf("Use the exact metric name from results in get_metric_search or get_metric_graph: name:\"%s\"", matches[0].Name),
-						"Use facet_options to get available values for filtering (e.g., service.name values).",
+						"Use facet_options tool to get available values for filtering (e.g., service.name values).",
 					},
 				}
 			} else {
@@ -316,7 +316,7 @@ Use the exact metric name from results in get_metric_search or get_metric_graph.
 					},
 					Suggestions: []string{
 						"Try a different search term or check if metrics are being collected.",
-						"Use facet_options with scope:'metric' and facet_path:'name' to see all available metrics.",
+						"Use facet_options tool with scope:'metric' and facet_path:'name' to see all available metrics.",
 					},
 				}
 			}

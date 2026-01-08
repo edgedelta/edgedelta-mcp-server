@@ -89,7 +89,7 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 				Guidance: &DashboardGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Use get_dashboard with dashboard_id to get detailed information for a specific dashboard.",
+						"Use get_dashboard tool with dashboard_id to get detailed information for a specific dashboard.",
 						"Dashboard IDs can be found in the response above.",
 					},
 				},
@@ -110,7 +110,7 @@ func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerF
 			mcp.WithTitleAnnotation("Get Dashboard"),
 			mcp.WithDescription(`Get detailed configuration for a specific dashboard.
 
-PREREQUISITE: Call get_all_dashboards first to obtain the dashboard_id.
+PREREQUISITE: Call get_all_dashboards tool first to obtain the dashboard_id.
 
 Returns full dashboard configuration including widget definitions and layout.`),
 			mcp.WithString("dashboard_id",
@@ -164,7 +164,7 @@ Returns full dashboard configuration including widget definitions and layout.`),
 					ResultStatus: "success",
 					NextSteps: []string{
 						"Dashboard details retrieved successfully.",
-						"Use get_all_dashboards to see other available dashboards.",
+						"Use get_all_dashboards tool to see other available dashboards.",
 					},
 				},
 			}

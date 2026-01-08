@@ -55,7 +55,7 @@ var FacetsTool = mcp.NewTool("facets",
 	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
 
 WHEN TO USE:
-- Use discover_schema instead for most cases - it provides facet_keys plus sample values and CQL syntax
+- Use discover_schema tool instead for most cases - it provides facet_keys plus sample values and CQL syntax
 - Use this tool only if you need a complete list of field names without values
 
 This tool returns field NAMES only, not their values.
@@ -87,7 +87,7 @@ WHEN TO USE:
 - discover_schema only pre-fetches up to 10 values for a few common fields; use facet_options for complete values or other fields
 - Use before constructing queries to ensure values exist in your data
 
-Use build_cql to construct queries or validate_cql to check syntax.`),
+Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.`),
 	mcp.WithString("facet_path",
 		mcp.Description("The facet path to retrieve options for."),
 		mcp.Required(),
@@ -147,9 +147,9 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 			response.Guidance = &FacetGuidance{
 				ResultStatus: "success",
 				NextSteps: []string{
-					"Use facet_options tool to get available values for any field listed above.",
+					"Use facet_options tool to get values for any field listed above.",
 					fmt.Sprintf("Example: facet_options(scope:\"%s\", facet_path:\"<field_name>\") to see values.", scope),
-					"Use build_cql to construct queries or validate_cql to check syntax.",
+					"Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.",
 				},
 			}
 		}
@@ -242,7 +242,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 				NextSteps: []string{
 					fmt.Sprintf("Use these values in your CQL query: %s:\"<value>\"", facet),
 					fmt.Sprintf("Example: %s:\"%s\"", facet, options[0].Name),
-					"Use build_cql to construct queries or validate_cql to check syntax.",
+					"Use build_cql tool to construct queries from structured parameters, or validate_cql tool to check existing query syntax.",
 				},
 			}
 		}
