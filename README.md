@@ -78,6 +78,59 @@ docker buildx build --load -t mcp/edgedelta .
 }
 ```
 
+## Available Tools
+
+The Edge Delta MCP Server provides the following tools for interacting with Edge Delta APIs:
+
+### Dashboard Management
+
+- **get_all_dashboards** - Retrieve all dashboards in the organization
+  - Optional parameter: `include_definitions` (boolean) - Include full dashboard definitions in response
+
+- **get_dashboard** - Retrieve a specific dashboard by ID
+  - Required parameter: `dashboard_id` (string) - Dashboard ID to retrieve
+
+- **create_dashboard** - Create a new dashboard in the organization
+  - Required parameter: `dashboard_definition` (string) - JSON string containing dashboard definition
+  - Returns: Created dashboard with auto-populated fields (dashboard_id, creator, timestamps)
+
+- **update_dashboard** - Update an existing dashboard
+  - Required parameters:
+    - `dashboard_id` (string) - Dashboard ID to update
+    - `dashboard_definition` (string) - JSON string with fields to update
+  - Note: Immutable fields (creator, created, shared_hash) are preserved automatically
+
+- **delete_dashboard** - Permanently delete a dashboard
+  - Required parameter: `dashboard_id` (string) - Dashboard ID to delete
+  - Warning: This operation cannot be undone
+
+### Pipeline Management
+
+- **get_pipelines** - Retrieve pipelines from Edge Delta
+- **get_pipeline_history** - Get version history for a pipeline
+- **deploy_pipeline** - Deploy a pipeline configuration
+- **add_pipeline_source** - Add source nodes to pipelines
+
+### Data Search & Analysis
+
+- **get_log_search** - Search logs using Edge Delta query syntax
+- **get_metric_search** - Search metrics data
+- **get_event_search** - Search events and anomalies
+- **get_log_patterns** - Retrieve log pattern analysis
+- **get_trace_timeline** - Get trace timeline data
+
+### Visualization & Graphs
+
+- **get_log_graph** - Generate log graphs
+- **get_metric_graph** - Generate metric graphs
+- **get_trace_graph** - Generate trace graphs
+- **get_pattern_graph** - Generate pattern graphs
+
+### Metadata & Facets
+
+- **facets** - Retrieve available facets for filtering
+- **facet_options** - Get options for specific facets
+
 ## Library Usage
 
 The exported Go API of this module is **experimental** and may change without notice.

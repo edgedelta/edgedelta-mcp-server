@@ -74,6 +74,14 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	// Dashboard tools
 	s.AddTool(tools.GetAllDashboardsTool(client))
 	s.AddTool(tools.GetDashboardTool(client))
+	s.AddTool(tools.CreateDashboardTool(client))
+	s.AddTool(tools.UpdateDashboardTool(client))
+	s.AddTool(tools.DeleteDashboardTool(client))
+
+	// Dashboard builder tools
+	s.AddTool(tools.GetDashboardSchemaTool())
+	s.AddTool(tools.CreateWidgetTool())
+	s.AddTool(tools.AssembleDashboardTool(client))
 
 	// Graph/visualization tools
 	s.AddTool(tools.GetLogGraphTool(client))
