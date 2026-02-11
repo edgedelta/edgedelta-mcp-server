@@ -26,7 +26,7 @@ type VersionRule struct{}
 
 func (r *VersionRule) Name() string { return "version" }
 
-func (r *VersionRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *VersionRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 	if ctx.Version != DashboardVersion {
 		result.AddError(
@@ -43,7 +43,7 @@ type RootWidgetRule struct{}
 
 func (r *RootWidgetRule) Name() string { return "root_widget" }
 
-func (r *RootWidgetRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *RootWidgetRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 	hasRoot := false
 	for _, w := range ctx.Widgets {
@@ -67,7 +67,7 @@ type UniqueIDsRule struct{}
 
 func (r *UniqueIDsRule) Name() string { return "unique_ids" }
 
-func (r *UniqueIDsRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *UniqueIDsRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 	seen := make(map[interface{}]bool)
 
@@ -91,8 +91,13 @@ type WidgetTypeRule struct{}
 
 func (r *WidgetTypeRule) Name() string { return "widget_type" }
 
-func (r *WidgetTypeRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *WidgetTypeRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
+
+	types := validWidgetTypes
+	if WidgetTypeProvider != nil {
+		types = WidgetTypeProvider()
+	}
 
 	for _, w := range ctx.Widgets {
 		widgetType, ok := w["type"].(string)
@@ -106,7 +111,7 @@ func (r *WidgetTypeRule) Validate(ctx *ValidationContext) *ValidationResult {
 			continue
 		}
 
-		if !slices.Contains(validWidgetTypes, widgetType) {
+		if !slices.Contains(types, widgetType) {
 			id := w["id"]
 			result.AddError(
 				fmt.Sprintf("widget[%v].type", id),

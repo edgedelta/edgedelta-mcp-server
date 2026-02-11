@@ -7,7 +7,7 @@ type VariableReferenceRule struct{}
 
 func (r *VariableReferenceRule) Name() string { return "variable_reference" }
 
-func (r *VariableReferenceRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *VariableReferenceRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 
 	// Build set of valid variable IDs
@@ -63,7 +63,7 @@ type TargetIDReferenceRule struct{}
 
 func (r *TargetIDReferenceRule) Name() string { return "target_id_reference" }
 
-func (r *TargetIDReferenceRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *TargetIDReferenceRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 
 	// Build set of valid widget IDs

@@ -22,6 +22,7 @@ func NewValidator() *Validator {
 			&UniqueIDsRule{},
 			&WidgetTypeRule{},
 			&VariableReferenceRule{},
+			&TargetIDReferenceRule{},
 			&GridOverlapRule{},
 			&HierarchyCycleRule{},
 			&MarkdownContentRule{},
@@ -66,12 +67,12 @@ func (v *Validator) ValidateJSON(data []byte) *ValidationResult {
 }
 
 // parseContext extracts validation context from the definition.
-func parseContext(def map[string]interface{}) (*ValidationContext, error) {
+func parseContext(def map[string]interface{}) (*DashboardContext, error) {
 	if def == nil {
 		return nil, fmt.Errorf("dashboard definition cannot be nil")
 	}
 
-	ctx := &ValidationContext{}
+	ctx := &DashboardContext{}
 
 	// Extract version
 	if v, ok := def["version"]; ok {

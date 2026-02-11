@@ -32,7 +32,7 @@ var eventHandlerPattern = regexp.MustCompile(`(?i)\s+on\w+\s*=`)
 // JavaScript protocol in URLs
 var jsProtocolPattern = regexp.MustCompile(`(?i)(?:href|src|action)\s*=\s*["']?\s*javascript:`)
 
-func (r *MarkdownContentRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *MarkdownContentRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 
 	for _, w := range ctx.Widgets {
@@ -123,39 +123,4 @@ func getSuggestionForTag(tag string) string {
 	default:
 		return fmt.Sprintf("Remove <%s> tag - not supported in markdown widgets", tag)
 	}
-}
-
-// ContentSecurityRule checks for additional content security issues.
-type ContentSecurityRule struct{}
-
-func (r *ContentSecurityRule) Name() string { return "content_security" }
-
-func (r *ContentSecurityRule) Validate(ctx *ValidationContext) *ValidationResult {
-	result := &ValidationResult{}
-
-	for _, w := range ctx.Widgets {
-		widgetType, _ := w["type"].(string)
-		widgetID := w["id"]
-
-		// Check viz widgets for potential injection in titles/descriptions
-		if widgetType == "viz" {
-			if displayOpts, ok := w["displayOptions"].(map[string]interface{}); ok {
-				if title, ok := displayOpts["title"].(string); ok {
-					if containsHTMLTags(title) {
-						result.AddError(
-							fmt.Sprintf("widget[%v].displayOptions.title", widgetID),
-							"HTML tags in widget title may not render as expected",
-							"Use plain text for widget titles",
-						)
-					}
-				}
-			}
-		}
-	}
-
-	return result
-}
-
-func containsHTMLTags(s string) bool {
-	return regexp.MustCompile(`<[a-zA-Z][^>]*>`).MatchString(s)
 }

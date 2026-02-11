@@ -18,7 +18,7 @@ func TestVersionRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Version: tt.version}
+			ctx := &DashboardContext{Version: tt.version}
 			rule := &VersionRule{}
 			result := rule.Validate(ctx)
 
@@ -61,7 +61,7 @@ func TestRootWidgetRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &RootWidgetRule{}
 			result := rule.Validate(ctx)
 
@@ -102,7 +102,7 @@ func TestUniqueIDsRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &UniqueIDsRule{}
 			result := rule.Validate(ctx)
 
@@ -149,7 +149,7 @@ func TestWidgetTypeRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &WidgetTypeRule{}
 			result := rule.Validate(ctx)
 
@@ -229,7 +229,7 @@ func TestGridOverlapRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &GridOverlapRule{}
 			result := rule.Validate(ctx)
 
@@ -294,7 +294,7 @@ func TestHierarchyCycleRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &HierarchyCycleRule{}
 			result := rule.Validate(ctx)
 
@@ -358,7 +358,7 @@ func TestVariableReferenceRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{
+			ctx := &DashboardContext{
 				Widgets:   tt.widgets,
 				Variables: tt.variables,
 			}
@@ -509,7 +509,7 @@ func TestMarkdownContentRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := &ValidationContext{Widgets: tt.widgets}
+			ctx := &DashboardContext{Widgets: tt.widgets}
 			rule := &MarkdownContentRule{}
 			result := rule.Validate(ctx)
 
@@ -585,6 +585,58 @@ func TestAreasCollide(t *testing.T) {
 			got := areasCollide(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("areasCollide(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTargetIDReferenceRule(t *testing.T) {
+	tests := []struct {
+		name      string
+		widgets   []map[string]interface{}
+		wantError bool
+	}{
+		{
+			name: "valid targetId reference",
+			widgets: []map[string]interface{}{
+				{"id": "root", "type": "grid"},
+				{
+					"id":   1,
+					"type": "viz",
+					"position": map[string]interface{}{
+						"targetId": "root",
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid targetId reference",
+			widgets: []map[string]interface{}{
+				{"id": "root", "type": "grid"},
+				{
+					"id":   1,
+					"type": "viz",
+					"position": map[string]interface{}{
+						"targetId": "nonexistent",
+					},
+				},
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &DashboardContext{Widgets: tt.widgets}
+			rule := &TargetIDReferenceRule{}
+			result := rule.Validate(ctx)
+
+			if tt.wantError && result.IsValid() {
+				t.Error("expected error for invalid targetId reference")
+			}
+			if !tt.wantError && !result.IsValid() {
+				t.Errorf("unexpected error: %v", result.Errors)
 			}
 		})
 	}

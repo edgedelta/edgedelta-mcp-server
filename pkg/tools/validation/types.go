@@ -33,8 +33,8 @@ func (r *ValidationResult) Merge(other *ValidationResult) {
 	}
 }
 
-// ValidationContext holds the dashboard definition being validated.
-type ValidationContext struct {
+// DashboardContext holds the dashboard definition being validated.
+type DashboardContext struct {
 	Version   int                      `json:"version"`
 	Widgets   []map[string]interface{} `json:"widgets"`
 	Variables []map[string]interface{} `json:"variables,omitempty"`
@@ -49,10 +49,14 @@ type GridArea struct {
 	WidgetID   interface{} // Can be int or string
 }
 
+// WidgetTypeProvider returns valid widget types from the schema package.
+// Set by dashboard_schema.go init() to avoid import cycles.
+var WidgetTypeProvider func() []string
+
 // Rule is the interface that all validation rules must implement.
 type Rule interface {
 	// Name returns the rule identifier for error reporting.
 	Name() string
 	// Validate checks the context and returns any errors found.
-	Validate(ctx *ValidationContext) *ValidationResult
+	Validate(ctx *DashboardContext) *ValidationResult
 }

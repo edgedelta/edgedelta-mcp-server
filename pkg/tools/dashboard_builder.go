@@ -125,9 +125,18 @@ WORKFLOW:
 			mcp.WithString("coloring_mode",
 				mcp.Description("Color assignment mode: auto, categorical, random, or palette"),
 			),
-			// Layout parameter
-			mcp.WithString("position_area",
-				mcp.Description("Grid position area (A, B, C, etc.) for custom layouts"),
+			// Layout parameters (12-column grid, 1-indexed)
+			mcp.WithNumber("column",
+				mcp.Description("Grid column start position (1-12). Default: auto-layout"),
+			),
+			mcp.WithNumber("column_span",
+				mcp.Description("Number of columns to span (1-12). Default: 6. Use 12 for full-width."),
+			),
+			mcp.WithNumber("row",
+				mcp.Description("Grid row start position (1-based). Default: auto-layout"),
+			),
+			mcp.WithNumber("row_span",
+				mcp.Description("Number of rows to span (1+). Default: 4. Use 1 for compact widgets like variable controls."),
 			),
 			// Markdown-specific
 			mcp.WithString("content",
@@ -190,8 +199,22 @@ func createWidgetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	lookback, _ := args["lookback"].(string)
 	showLegend, _ := args["show_legend"].(string)
 	coloringMode, _ := args["coloring_mode"].(string)
-	positionArea, _ := args["position_area"].(string)
 	content, _ := args["content"].(string)
+
+	// Layout position parameters
+	var column, columnSpan, row, rowSpan int
+	if v, ok := args["column"].(float64); ok {
+		column = int(v)
+	}
+	if v, ok := args["column_span"].(float64); ok {
+		columnSpan = int(v)
+	}
+	if v, ok := args["row"].(float64); ok {
+		row = int(v)
+	}
+	if v, ok := args["row_span"].(float64); ok {
+		rowSpan = int(v)
+	}
 
 	// Variable-control specific
 	var variableID int
@@ -328,7 +351,10 @@ func createWidgetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 		Lookback:       lookback,
 		ShowLegend:     showLegend,
 		ColoringMode:   coloringMode,
-		PositionArea:   positionArea,
+		Column:         column,
+		ColumnSpan:     columnSpan,
+		Row:            row,
+		RowSpan:        rowSpan,
 		Content:        content,
 		VariableID:     variableID,
 		TabLabels:      tabLabels,
@@ -425,9 +451,11 @@ func assembleDashboardHandler(ctx context.Context, request mcp.CallToolRequest, 
 
 	// Extract variables for dashboard filters
 	var variables []map[string]interface{}
+	var rawVariables []map[string]interface{}
 	if varsArg, ok := args["variables"].([]interface{}); ok {
 		for _, v := range varsArg {
 			if varMap, ok := v.(map[string]interface{}); ok {
+				rawVariables = append(rawVariables, varMap)
 				variable := parseVariableFromMap(varMap)
 				variables = append(variables, variable)
 			}
@@ -456,7 +484,7 @@ func assembleDashboardHandler(ctx context.Context, request mcp.CallToolRequest, 
 		"timeFilters": map[string]interface{}{
 			"lookback": lookback,
 		},
-		"widgets": buildV4Widgets(widgets),
+		"widgets": buildV4Widgets(widgets, rawVariables),
 	}
 
 	// Add variables if provided
@@ -467,16 +495,7 @@ func assembleDashboardHandler(ctx context.Context, request mcp.CallToolRequest, 
 	// Validate the assembled dashboard definition
 	validationResult := validation.ValidateDashboard(definition)
 	if !validationResult.IsValid() {
-		// Convert validation errors to our format
-		var validationErrors []ValidationError
-		for _, ve := range validationResult.Errors {
-			validationErrors = append(validationErrors, ValidationError{
-				Parameter:  ve.Parameter,
-				Message:    ve.Message,
-				Suggestion: ve.Suggestion,
-			})
-		}
-		return returnValidationErrors(validationErrors)
+		return returnValidationErrors(validationResult.Errors)
 	}
 
 	dashboardDef := map[string]interface{}{
@@ -589,8 +608,18 @@ func parseWidgetFromMap(m map[string]interface{}) WidgetConfig {
 	if cm, ok := m["coloring_mode"].(string); ok {
 		widget.ColoringMode = cm
 	}
-	if pa, ok := m["position_area"].(string); ok {
-		widget.PositionArea = pa
+	// Layout position fields
+	if v, ok := m["column"].(float64); ok {
+		widget.Column = int(v)
+	}
+	if v, ok := m["column_span"].(float64); ok {
+		widget.ColumnSpan = int(v)
+	}
+	if v, ok := m["row"].(float64); ok {
+		widget.Row = int(v)
+	}
+	if v, ok := m["row_span"].(float64); ok {
+		widget.RowSpan = int(v)
 	}
 	if c, ok := m["content"].(string); ok {
 		widget.Content = c
@@ -633,17 +662,68 @@ func parseWidgetFromMap(m map[string]interface{}) WidgetConfig {
 
 // buildV4Widgets converts simplified WidgetConfig structs to EdgeDelta v4 API format.
 // Returns the root grid widget followed by all content widgets.
-func buildV4Widgets(widgets []WidgetConfig) []map[string]interface{} {
+func buildV4Widgets(widgets []WidgetConfig, variables []map[string]interface{}) []map[string]interface{} {
 	var result []map[string]interface{}
 
-	// Calculate grid dimensions based on widget count
-	// Use 12 columns (standard), rows based on widget layout
-	numWidgets := len(widgets)
-	rowsNeeded := ((numWidgets + 1) / 2) * 4 // 4 rows per widget row, 2 widgets per row
+	// Resolve positions: use custom positions when provided, auto-layout for the rest.
+	// We need two passes: first to assign positions, then to compute grid row count.
+	type resolvedPos struct {
+		col, colSpan, row, rowSpan int
+		isTab                      bool
+	}
+	positions := make([]resolvedPos, len(widgets))
+	autoIdx := 0 // counter for auto-laid-out widgets only
+
+	for i, w := range widgets {
+		if w.TargetTabID > 0 {
+			positions[i] = resolvedPos{isTab: true}
+			continue
+		}
+		if w.Row > 0 && w.Column > 0 {
+			// Custom position provided
+			colSpan := w.ColumnSpan
+			if colSpan == 0 {
+				colSpan = 6
+			}
+			rowSpan := w.RowSpan
+			if rowSpan == 0 {
+				rowSpan = 4
+			}
+			positions[i] = resolvedPos{col: w.Column, colSpan: colSpan, row: w.Row, rowSpan: rowSpan}
+		} else {
+			// Auto-layout: 2 widgets per row, 6 columns each
+			col := (autoIdx%2)*6 + 1
+			row := (autoIdx/2)*4 + 1
+			colSpan := w.ColumnSpan
+			if colSpan == 0 {
+				colSpan = 6
+			}
+			rowSpan := w.RowSpan
+			if rowSpan == 0 {
+				rowSpan = 4
+			}
+			positions[i] = resolvedPos{col: col, colSpan: colSpan, row: row, rowSpan: rowSpan}
+			autoIdx++
+		}
+	}
+
+	// Calculate grid rows from actual widget extents
+	maxRow := 0
+	for _, p := range positions {
+		if p.isTab {
+			continue
+		}
+		if end := p.row + p.rowSpan - 1; end > maxRow {
+			maxRow = end
+		}
+	}
+	if maxRow == 0 {
+		maxRow = 4
+	}
 
 	// Build grid template string: "72px 72px ... / 1fr 1fr ... 1fr" (12 columns)
 	var rowParts []string
-	for i := 0; i < rowsNeeded; i++ {
+	for i := 0; i < maxRow; i++ {
 		rowParts = append(rowParts, "72px")
 	}
 	gridTemplate := strings.Join(rowParts, " ") + " / 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
@@ -664,27 +744,20 @@ func buildV4Widgets(widgets []WidgetConfig) []map[string]interface{} {
 		widgetID := i + 1 // 1-indexed widget IDs
 		var position map[string]interface{}
 
-		// Check if this widget should be positioned inside a tab
-		if w.TargetTabID > 0 {
-			// Widget goes inside a tab container
+		p := positions[i]
+		if p.isTab {
 			position = map[string]interface{}{
 				"type":     "tab",
 				"targetId": w.TargetTabID,
 				"index":    w.TabIndex,
 			}
 		} else {
-			// Standard grid position (2 widgets per row, 6 columns each)
-			col := (i%2)*6 + 1 // 1 or 7
-			row := (i/2)*4 + 1 // 1, 5, 9, ...
-			colSpan := 6
-			rowSpan := 4
-
 			position = map[string]interface{}{
 				"area": map[string]interface{}{
-					"column":     col,
-					"columnSpan": colSpan,
-					"row":        row,
-					"rowSpan":    rowSpan,
+					"column":     p.col,
+					"columnSpan": p.colSpan,
+					"row":        p.row,
+					"rowSpan":    p.rowSpan,
 				},
 				"targetId": "root",
 				"type":     "grid",
@@ -766,7 +839,7 @@ func buildV4Widgets(widgets []WidgetConfig) []map[string]interface{} {
 				"position":   position,
 				"resultType": getResultType(w.Type),
 				"visualizer": buildVisualizer(w),
-				"visuals":    buildVisuals(w),
+				"visuals":    buildVisuals(w, variables),
 			}
 		}
 
@@ -823,8 +896,29 @@ func buildVisualizer(w WidgetConfig) map[string]interface{} {
 	return viz
 }
 
+// buildFilterFromVariables builds a CQL filter expression from dashboard variable configs.
+// Variables with a scope that doesn't match the data source type are skipped.
+func buildFilterFromVariables(variables []map[string]interface{}, dsType string) string {
+	var parts []string
+	for _, v := range variables {
+		scope, _ := v["scope"].(string)
+		if scope != "" && scope != dsType {
+			continue // skip variables that don't match data source type
+		}
+		facet, _ := v["facet"].(string)
+		key, _ := v["key"].(string)
+		if facet != "" && key != "" {
+			parts = append(parts, fmt.Sprintf("%s:$%s", facet, key))
+		}
+	}
+	if len(parts) == 0 {
+		return "*"
+	}
+	return strings.Join(parts, " ")
+}
+
 // buildVisuals creates the v4 visuals array with dataSource.
-func buildVisuals(w WidgetConfig) []map[string]interface{} {
+func buildVisuals(w WidgetConfig, variables []map[string]interface{}) []map[string]interface{} {
 	if w.DataSourceType == "" && w.Query == "" && w.MetricName == "" {
 		return []map[string]interface{}{}
 	}
@@ -837,27 +931,26 @@ func buildVisuals(w WidgetConfig) []map[string]interface{} {
 
 	var query string
 
-	// Build metric query from metric_name and aggregation if provided
 	if dsType == "metric" && w.MetricName != "" && w.Query == "" {
-		// Format: {aggregation}:{metric_name}{filter}.rollup(interval)
-		// Example: sum:istio_requests_total{*}.rollup(60)
+		// Metric branch: build CQL from parts
+		// Pattern: agg:metric{filter} by {groupBy}.rollup(interval)
 		agg := w.Aggregation
 		if agg == "" {
-			agg = "sum" // default aggregation
+			agg = "sum"
 		}
-		query = fmt.Sprintf("%s:%s{*}.rollup(60)", agg, w.MetricName)
+		filter := buildFilterFromVariables(variables, dsType)
+		query = fmt.Sprintf("%s:%s{%s}", agg, w.MetricName, filter)
+		if len(w.GroupBy) > 0 {
+			query += fmt.Sprintf(" by {%s}", strings.Join(w.GroupBy, ", "))
+		}
+		query += ".rollup(60)"
 	} else {
-		// Use provided query directly
+		// Non-metric branch: raw query passthrough
 		query = w.Query
-		// Fix empty filter syntax: {} should be {*} for "all"
 		query = strings.ReplaceAll(query, "{}", "{*}")
-	}
-
-	// Append group_by clause for log queries with aggregate widgets
-	// Format: "{*} by {field1, field2}"
-	if len(w.GroupBy) > 0 && (dsType == "log" || dsType == "trace" || dsType == "event") {
-		groupByClause := " by {" + strings.Join(w.GroupBy, ", ") + "}"
-		query = query + groupByClause
+		if len(w.GroupBy) > 0 && (dsType == "log" || dsType == "trace" || dsType == "event") {
+			query += " by {" + strings.Join(w.GroupBy, ", ") + "}"
+		}
 	}
 
 	dataSource := map[string]interface{}{

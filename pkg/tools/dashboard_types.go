@@ -1,5 +1,7 @@
 package tools
 
+import "github.com/edgedelta/edgedelta-mcp-server/pkg/tools/validation"
+
 // WidgetConfig is the output of create_widget, passed to assemble_dashboard.
 type WidgetConfig struct {
 	// Identity
@@ -23,8 +25,11 @@ type WidgetConfig struct {
 	ShowLegend   string `json:"show_legend,omitempty"`   // auto, always, never
 	ColoringMode string `json:"coloring_mode,omitempty"` // auto, categorical, random, palette
 
-	// Layout (optional)
-	PositionArea string `json:"position_area,omitempty"` // Grid area (A, B, C, etc.)
+	// Layout (optional) - grid position fields (1-indexed, 12-column grid)
+	Column     int `json:"column,omitempty"`      // Grid column start (1-12)
+	ColumnSpan int `json:"column_span,omitempty"` // Column span (1-12, default 6)
+	Row        int `json:"row,omitempty"`         // Grid row start (1-based)
+	RowSpan    int `json:"row_span,omitempty"`    // Row span (default 4)
 
 	// Markdown-specific
 	Content string `json:"content,omitempty"` // For markdown widget type
@@ -87,12 +92,8 @@ type SchemaResponse struct {
 	VizTypes           []string           `json:"viz_types"`
 }
 
-// ValidationError represents a single validation error with suggestion for correction.
-type ValidationError struct {
-	Parameter  string `json:"parameter"`
-	Message    string `json:"message"`
-	Suggestion string `json:"suggestion,omitempty"`
-}
+// ValidationError is an alias for validation.ValidationError (single source of truth).
+type ValidationError = validation.ValidationError
 
 // ValidationErrorResponse is returned when widget creation fails validation.
 type ValidationErrorResponse struct {

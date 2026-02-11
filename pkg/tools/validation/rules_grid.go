@@ -7,7 +7,7 @@ type GridOverlapRule struct{}
 
 func (r *GridOverlapRule) Name() string { return "grid_overlap" }
 
-func (r *GridOverlapRule) Validate(ctx *ValidationContext) *ValidationResult {
+func (r *GridOverlapRule) Validate(ctx *DashboardContext) *ValidationResult {
 	result := &ValidationResult{}
 
 	// Group widgets by their parent (targetId)

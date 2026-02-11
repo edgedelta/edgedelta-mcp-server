@@ -1,6 +1,16 @@
 package tools
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools/validation"
+)
+
+func init() {
+	validation.WidgetTypeProvider = func() []string {
+		return append(AllWidgetTypes(), "viz")
+	}
+}
 
 // Widget type constants - 26 types across 5 categories
 const (
@@ -221,7 +231,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Line chart for time-series data visualization",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeLine,
 				"title":            "API Latency Over Time",
@@ -229,6 +239,10 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 				"metric_name":      "http.request.duration",
 				"aggregation":      AggregationAvg,
 				"lookback":         "1h",
+				"column":           1,
+				"column_span":      6,
+				"row":              1,
+				"row_span":         4,
 			},
 		},
 		{
@@ -236,7 +250,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Stacked area chart for cumulative time-series visualization",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeArea,
 				"title":            "Request Volume by Service",
@@ -251,7 +265,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Vertical bar chart over time",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeBar,
 				"title":            "Errors per Hour",
@@ -265,7 +279,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Scatter plot for correlation analysis",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeScatter,
 				"title":            "Latency vs Throughput",
@@ -278,7 +292,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Step line chart showing discrete value changes",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeStep,
 				"title":            "Pod Count Over Time",
@@ -291,7 +305,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryTimeseries,
 			Description:    "Smoothed line chart with curve interpolation",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeSmooth,
 				"title":            "CPU Utilization Trend",
@@ -307,7 +321,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryScalar,
 			Description:    "Single large metric value for key KPIs",
 			RequiredParams: []string{"data_source_type", "aggregation"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeBigNumber,
 				"title":            "Total Errors (24h)",
@@ -322,7 +336,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryScalar,
 			Description:    "Gauge with min/max range for threshold visualization",
 			RequiredParams: []string{"data_source_type", "aggregation"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeGauge,
 				"title":            "CPU Usage",
@@ -338,7 +352,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Pie chart for proportional distribution",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypePie,
 				"title":            "Errors by Service",
@@ -353,7 +367,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Donut chart with center space for additional info",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeDonut,
 				"title":            "Traffic by Region",
@@ -368,7 +382,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Horizontal bar chart for category comparison",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeColumn,
 				"title":            "Top Services by Latency",
@@ -383,7 +397,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Radar/spider chart for multi-dimensional comparison",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeRadar,
 				"title":            "Service Health Metrics",
@@ -397,7 +411,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Hierarchical sunburst for nested category visualization",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeSunburst,
 				"title":            "Logs by Service and Level",
@@ -411,7 +425,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Treemap for hierarchical data with area-based sizing",
 			RequiredParams: []string{"data_source_type", "group_by"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeTreemap,
 				"title":            "Storage by Namespace",
@@ -426,7 +440,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Sankey flow diagram for visualizing data flow",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeSankey,
 				"title":            "Request Flow",
@@ -439,7 +453,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryAggregates,
 			Description:    "Bubble chart with three dimensions (x, y, size)",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "show_legend", "coloring_mode", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeBubble,
 				"title":            "Services by Latency and Volume",
@@ -455,7 +469,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Formatted data table with sortable columns",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeTable,
 				"title":            "Top Errors",
@@ -469,7 +483,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Raw data table showing individual records",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeRawTable,
 				"title":            "Recent Logs",
@@ -482,7 +496,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "List view for displaying items vertically",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeList,
 				"title":            "Active Alerts",
@@ -495,7 +509,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Geographic map for location-based data",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "metric_name", "aggregation", "group_by", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeGeomap,
 				"title":            "Requests by Location",
@@ -509,7 +523,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Raw JSON display for debugging or detailed data inspection",
 			RequiredParams: []string{"data_source_type"},
-			OptionalParams: []string{"title", "description", "query", "lookback", "position_area"},
+			OptionalParams: []string{"title", "description", "query", "lookback", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type":      WidgetTypeJSON,
 				"title":            "Raw Event Data",
@@ -522,7 +536,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Placeholder widget for reserving dashboard space",
 			RequiredParams: []string{},
-			OptionalParams: []string{"title", "description", "position_area"},
+			OptionalParams: []string{"title", "description", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type": WidgetTypeEmpty,
 				"title":       "Coming Soon",
@@ -533,7 +547,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryOther,
 			Description:    "Markdown text for documentation and notes",
 			RequiredParams: []string{"content"},
-			OptionalParams: []string{"title", "description", "position_area"},
+			OptionalParams: []string{"title", "description", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type": WidgetTypeMarkdown,
 				"title":       "Dashboard Guide",
@@ -547,7 +561,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryLayout,
 			Description:    "Grid container for organizing nested widgets",
 			RequiredParams: []string{},
-			OptionalParams: []string{"title", "description", "position_area"},
+			OptionalParams: []string{"title", "description", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type": WidgetTypeGrid,
 				"title":       "Metrics Section",
@@ -558,7 +572,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryLayout,
 			Description:    "Tabbed container for grouping related widgets. Child widgets use target_tab_id and tab_index to position inside tabs.",
 			RequiredParams: []string{"tab_labels"},
-			OptionalParams: []string{"title", "description", "position_area"},
+			OptionalParams: []string{"title", "description", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type": WidgetTypeTabs,
 				"title":       "Service Details",
@@ -570,7 +584,7 @@ func GetWidgetTypeSchemas() []WidgetTypeSchema {
 			Category:       CategoryLayout,
 			Description:    "Variable selector for dynamic dashboard filtering. Requires a variable_id matching a variable defined in assemble_dashboard.",
 			RequiredParams: []string{"variable_id"},
-			OptionalParams: []string{"title", "description", "position_area"},
+			OptionalParams: []string{"title", "description", "column", "column_span", "row", "row_span"},
 			Example: map[string]any{
 				"widget_type": WidgetTypeVariableControl,
 				"title":       "Fleet Selector",
