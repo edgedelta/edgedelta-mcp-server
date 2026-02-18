@@ -541,7 +541,9 @@ Example node configurations:
 
 func SavePipelineTool(client Client) (mcp.Tool, server.ToolHandlerFunc) {
 	description := `Save pipeline configuration. This saves the pipeline YAML content but does NOT deploy it.
-After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.`
+After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.
+
+IMPORTANT: The YAML content MUST include 'version: v3' at the top level. It must also include an 'ed_self_telemetry_input' node and at least one output node (usually 'ed_output'). Use 'links:' (not 'routing:') to define connections between nodes. Use get_pipeline_config first to see the current format if unsure.`
 
 	return mcp.NewTool("save_pipeline",
 			mcp.WithTitleAnnotation("Save Pipeline"),
