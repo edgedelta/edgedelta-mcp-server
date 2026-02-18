@@ -209,16 +209,32 @@ func validatePipelineYAML(content string) validationResult {
 	return result
 }
 
+// sequenceCompatibleProcessors is the authoritative list from
+// configv3/config_validation.go validateSequenceNode().
 var sequenceCompatibleProcessors = map[string]bool{
-	"generic_mask": true, "extract_metric": true, "ottl_transform": true,
-	"sample": true, "dedup": true, "log_to_pattern_metric": true,
-	"delete_empty_values": true, "json_unroll": true, "log_to_metric": true,
-	"log_to_signal": true, "metric_to_log": true, "trace_to_log": true,
-	"log_to_log": true, "metric_to_metric": true, "trace_to_trace": true,
-	"attribute_filter": true, "regex_filter": true, "stateful_where": true,
-	"deotel": true, "http_request_call": true, "sampling": true,
-	"throttle": true, "regex_based_log_parser": true,
-	"sequence": true, "comment": true, "aggregate_metric": true, "ottl_filter": true,
+	"ottl_transform":         true,
+	"dedup":                  true,
+	"sample":                 true,
+	"suppress":               true,
+	"extract_metric":         true,
+	"aggregate_metric":       true,
+	"log_to_pattern_metric":  true,
+	"json_unroll":            true,
+	"generic_mask":           true,
+	"split_with_delimiter":   true,
+	"extract_json_field":     true,
+	"lookup":                 true,
+	"ottl_filter":            true,
+	"delete_empty_values":    true,
+	"tail_sample":            true,
+	"sequence":               true,
+	"ottl_context_filter":    true,
+	"compound":               true,
+	"deotel":                 true,
+	"quota":                  true,
+	"rate_limit":             true,
+	"cumulative_to_delta":    true,
+	"comment":                true,
 }
 
 func validateSequenceNode(name string, node map[string]any, result *validationResult) {
