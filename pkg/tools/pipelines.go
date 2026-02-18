@@ -316,6 +316,82 @@ Workflow for deployment:
 		}
 }
 
+// getLatestVersionTimestamp fetches pipeline history and returns the most recent
+// version's timestamp as a string (milliseconds format used by deploy API).
+func getLatestVersionTimestamp(ctx context.Context, client Client, orgID, token, confID string) (string, error) {
+	historyURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/history", client.APIURL(), orgID, confID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create history request: %w", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-ED-API-Token", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch history: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read history response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("history request failed with status %d", resp.StatusCode)
+	}
+
+	var entries []map[string]any
+	if err := json.Unmarshal(bodyBytes, &entries); err != nil {
+		return "", fmt.Errorf("failed to parse history response: %w", err)
+	}
+
+	if len(entries) == 0 {
+		return "", fmt.Errorf("no history entries found")
+	}
+
+	ts, ok := entries[0]["timestamp"]
+	if !ok {
+		return "", fmt.Errorf("first history entry has no timestamp field")
+	}
+
+	switch v := ts.(type) {
+	case float64:
+		return strconv.FormatInt(int64(v), 10), nil
+	case json.Number:
+		return v.String(), nil
+	default:
+		return fmt.Sprintf("%v", v), nil
+	}
+}
+
+// deployPipelineVersion calls the deploy API for a specific version.
+func deployPipelineVersion(ctx context.Context, client Client, orgID, token, confID, version string) error {
+	deployURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/deploy/%s", client.APIURL(), orgID, confID, version)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, deployURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create deploy request: %w", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-ED-API-Token", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("deploy request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("deploy failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
 // trimHistoryContent removes bulky fields (content, pipeline) from history entries
 // and limits the number of entries returned.
 func trimHistoryContent(data []byte, limit int) json.RawMessage {
@@ -605,8 +681,8 @@ Example node configurations:
 }
 
 func SavePipelineTool(client Client) (mcp.Tool, server.ToolHandlerFunc) {
-	description := `Save pipeline configuration. This saves the pipeline YAML content but does NOT deploy it.
-After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.
+	description := `Save pipeline configuration. By default saves only (does NOT deploy).
+Set deploy=true to save AND deploy in one step, eliminating the need for separate get_pipeline_history and deploy_pipeline calls.
 
 TIP: If unsure about field names for a node type, call get_pipeline_config on an existing pipeline that uses that node type and match its YAML structure exactly.
 
@@ -676,6 +752,10 @@ lookup (processor inside sequence):
 				mcp.Description("Save description/commit message for this change"),
 				mcp.Required(),
 			),
+			mcp.WithBoolean("deploy",
+				mcp.Description("If true, automatically deploy after saving (default false). Eliminates the need for separate get_pipeline_history + deploy_pipeline calls."),
+				mcp.DefaultBool(false),
+			),
 			mcp.WithReadOnlyHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(false),
 			mcp.WithDestructiveHintAnnotation(true),
@@ -704,6 +784,8 @@ lookup (processor inside sequence):
 				return mcp.NewToolResultError(fmt.Sprintf("Pipeline validation failed (not sent to API). Fix these errors and retry:\n%s", string(validationJSON))), nil
 			}
 
+			autoDeploy, _ := params.Optional[bool](request, "deploy")
+
 			result, err := SavePipeline(ctx, client, confID, desc, "", content)
 			if err != nil {
 				// Enhance the unhelpful 500 "Failed to read request content" error
@@ -711,6 +793,37 @@ lookup (processor inside sequence):
 					return nil, fmt.Errorf("API rejected the pipeline YAML (500). The YAML passed client-side validation but the server's strict parser rejected it. Common causes: wrong field names for the node type (e.g. 'url' instead of 'endpoint' for http_pull_input), headers as a map instead of array of {header, value} objects, or missing required node-specific fields. Use get_pipeline_config on a working pipeline to see the correct field format. Original error: %w", err)
 				}
 				return nil, fmt.Errorf("failed to save pipeline: %w", err)
+			}
+
+			nextSteps := []string{
+				"Pipeline configuration saved (not yet deployed).",
+				"Use get_pipeline_history tool to get the latest version timestamp.",
+				"Use deploy_pipeline tool with the version to deploy the updated configuration.",
+			}
+
+			// Auto-deploy: fetch latest history entry for timestamp, then deploy
+			if autoDeploy {
+				orgID, token, err := FetchContextKeys(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("save succeeded but deploy failed (cannot get context): %w", err)
+				}
+
+				version, err := getLatestVersionTimestamp(ctx, client, orgID, token, confID)
+				if err != nil {
+					// Save succeeded but couldn't get version — tell user to deploy manually
+					result["deploy_error"] = fmt.Sprintf("Save succeeded but could not fetch version for auto-deploy: %v. Deploy manually via get_pipeline_history + deploy_pipeline.", err)
+				} else {
+					deployErr := deployPipelineVersion(ctx, client, orgID, token, confID, version)
+					if deployErr != nil {
+						result["deploy_error"] = fmt.Sprintf("Save succeeded but deploy failed: %v. Deploy manually with deploy_pipeline(version=%s).", deployErr, version)
+					} else {
+						result["deployed_version"] = version
+						nextSteps = []string{
+							"Pipeline saved and deployed successfully.",
+							"Use get_pipeline_config to verify the deployed configuration.",
+						}
+					}
+				}
 			}
 
 			resultBytes, err := json.Marshal(result)
@@ -722,11 +835,7 @@ lookup (processor inside sequence):
 				Data: resultBytes,
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
-					NextSteps: []string{
-						"Pipeline configuration saved (not yet deployed).",
-						"Use get_pipeline_history tool to get the latest version timestamp.",
-						"Use deploy_pipeline tool with the version to deploy the updated configuration.",
-					},
+					NextSteps:    nextSteps,
 				},
 			}
 
