@@ -538,3 +538,74 @@ Example node configurations:
 			return mcp.NewToolResultText(string(r)), nil
 		}
 }
+
+func SavePipelineTool(client Client) (mcp.Tool, server.ToolHandlerFunc) {
+	description := `Save pipeline configuration. This saves the pipeline YAML content but does NOT deploy it.
+After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.`
+
+	return mcp.NewTool("save_pipeline",
+			mcp.WithTitleAnnotation("Save Pipeline"),
+			mcp.WithDescription(description),
+			mcp.WithString("conf_id",
+				mcp.Description("Config ID of the pipeline to save"),
+				mcp.Required(),
+			),
+			mcp.WithString("content",
+				mcp.Description("Full pipeline YAML content to save"),
+				mcp.Required(),
+			),
+			mcp.WithString("description",
+				mcp.Description("Save description/commit message for this change"),
+				mcp.Required(),
+			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			confID, err := request.RequireString("conf_id")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: conf_id"), err
+			}
+
+			content, err := request.RequireString("content")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: content"), err
+			}
+
+			desc, err := request.RequireString("description")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: description"), err
+			}
+
+			result, err := SavePipeline(ctx, client, confID, desc, "", content)
+			if err != nil {
+				return nil, fmt.Errorf("failed to save pipeline: %w", err)
+			}
+
+			resultBytes, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal result: %w", err)
+			}
+
+			response := PipelineToolResponse{
+				Data: resultBytes,
+				Guidance: &PipelineGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"Pipeline configuration saved (not yet deployed).",
+						"Use get_pipeline_history tool to get the latest version timestamp.",
+						"Use deploy_pipeline tool with the version to deploy the updated configuration.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response: %w", err)
+			}
+
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}
