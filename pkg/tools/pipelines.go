@@ -543,7 +543,20 @@ func SavePipelineTool(client Client) (mcp.Tool, server.ToolHandlerFunc) {
 	description := `Save pipeline configuration. This saves the pipeline YAML content but does NOT deploy it.
 After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.
 
-IMPORTANT: The YAML content MUST include 'version: v3' at the top level. It must also include an 'ed_self_telemetry_input' node and at least one output node (usually 'ed_output'). Use 'links:' (not 'routing:') to define connections between nodes. Use get_pipeline_config first to see the current format if unsure.`
+IMPORTANT pipeline v3 requirements:
+- 'version: v3' MUST be the first line
+- 'settings.tag' is required (pipeline identifier)
+- Must include an 'ed_self_telemetry_input' node and at least one output (usually 'ed_output')
+- Use 'links:' (not 'routing:') to define connections between nodes
+- All link 'from'/'to' values must reference existing node names
+- Sequence processors must be sequence-compatible (ottl_transform, generic_mask, extract_metric, regex_filter, sample, json_unroll, etc.)
+- Only the LAST processor in a sequence should have 'final: true'
+- If 'deotel' processor is used, it MUST be last in the sequence
+- Avoid 'persisting_cursor_settings' (causes API 500 errors)
+- No Unicode characters in YAML comments (no arrows, checkmarks)
+- json_field_path must use '$' not '.' as root
+
+Use get_pipeline_config first to see the current format if unsure.`
 
 	return mcp.NewTool("save_pipeline",
 			mcp.WithTitleAnnotation("Save Pipeline"),
