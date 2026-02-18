@@ -23,17 +23,20 @@ var knownNodeFields = map[string]map[string]bool{
 		"user_description": true, "data_types": true,
 	},
 	"http_workflow_input": {
-		"name": true, "type": true, "num_of_requests": true, "interval": true,
-		"initial_request": true, "metadata": true, "description": true,
+		"name": true, "type": true, "num_of_requests": true,
+		"workflow_pull_interval": true, "steps": true,
+		"metadata": true, "description": true,
 		"user_description": true, "data_types": true, "timeout": true,
 	},
 }
 
 // commonFieldMistakes maps wrong field names to the correct ones.
 var commonFieldMistakes = map[string]string{
-	"url":      "endpoint (for http_pull_input) or initial_request.endpoint (for http_workflow_input)",
-	"interval": "pull_interval (for http_pull_input) or keep as interval (for http_workflow_input)",
-	"routing":  "links",
+	"url":             "endpoint (for http_pull_input) or steps[].endpoint (for http_workflow_input)",
+	"interval":        "pull_interval (for http_pull_input) or workflow_pull_interval (for http_workflow_input)",
+	"routing":         "links",
+	"initial_request": "steps (for http_workflow_input)",
+	"log_level":       "log: { level: info } under settings",
 }
 
 type validationResult struct {

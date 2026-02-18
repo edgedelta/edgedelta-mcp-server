@@ -229,7 +229,7 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.
 
 REQUIRED FOR DEPLOYMENT: The version (timestamp field) from history is required when calling deploy_pipeline tool.
 
-Returns history entries with timestamps that serve as version identifiers.
+Returns metadata-only history entries (timestamp, description, updatedBy, tag). Full YAML content is stripped to keep responses small. Use get_pipeline_config to read full content.
 
 Workflow for deployment:
 1. get_pipeline_history(conf_id) → get version timestamps
@@ -237,6 +237,10 @@ Workflow for deployment:
 			mcp.WithString("conf_id",
 				mcp.Description("Config ID of the pipeline. Get this from get_pipelines response."),
 				mcp.Required(),
+			),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum number of history entries to return (default 5, max 50)"),
+				mcp.DefaultNumber(5),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(true),
@@ -254,10 +258,18 @@ Workflow for deployment:
 				return mcp.NewToolResultError("missing required parameter: conf_id"), err
 			}
 
+			limit := 5
+			if l, err := params.Optional[float64](request, "limit"); err == nil && l > 0 {
+				limit = int(l)
+				if limit > 50 {
+					limit = 50
+				}
+			}
+
 			historyURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/history", client.APIURL(), orgID, confID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %v", err)
+				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
@@ -271,21 +283,26 @@ Workflow for deployment:
 			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %v", err)
+				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 
 			if resp.StatusCode != http.StatusOK {
 				return nil, fmt.Errorf("failed to get pipeline history, status code %d: %s", resp.StatusCode, string(bodyBytes))
 			}
 
+			// Strip full YAML content from history entries to reduce response size.
+			// The API returns full config content per entry which can be 100KB+.
+			trimmedData := trimHistoryContent(bodyBytes, limit)
+
 			// Wrap with guidance
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: trimmedData,
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
 						"Use deploy_pipeline tool with conf_id and version (timestamp field from history) to deploy a specific version.",
 						"The version parameter should be the timestamp from the most recent history entry.",
+						"Use get_pipeline_config to read the full YAML content of the current configuration.",
 					},
 				},
 			}
@@ -297,6 +314,53 @@ Workflow for deployment:
 
 			return mcp.NewToolResultText(string(r)), nil
 		}
+}
+
+// trimHistoryContent removes bulky fields (content, pipeline) from history entries
+// and limits the number of entries returned.
+func trimHistoryContent(data []byte, limit int) json.RawMessage {
+	// Try as array of objects (most common shape)
+	var entries []map[string]any
+	if err := json.Unmarshal(data, &entries); err != nil {
+		// Try as object with nested array
+		var wrapper map[string]any
+		if err := json.Unmarshal(data, &wrapper); err != nil {
+			return data // can't parse, return as-is
+		}
+		// Look for an array field like "history" or "items"
+		for _, key := range []string{"history", "items", "data", "versions"} {
+			if arr, ok := wrapper[key]; ok {
+				if arrBytes, err := json.Marshal(arr); err == nil {
+					if err := json.Unmarshal(arrBytes, &entries); err == nil {
+						trimEntries(entries, limit)
+						wrapper[key] = entries
+						if out, err := json.Marshal(wrapper); err == nil {
+							return out
+						}
+					}
+				}
+			}
+		}
+		return data
+	}
+
+	trimEntries(entries, limit)
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+
+	if out, err := json.Marshal(entries); err == nil {
+		return out
+	}
+	return data
+}
+
+func trimEntries(entries []map[string]any, limit int) {
+	for i := range entries {
+		delete(entries[i], "content")
+		delete(entries[i], "pipeline")
+		delete(entries[i], "config_content")
+	}
 }
 
 // DeployPipelineTool creates a tool to deploy a pipeline configuration
@@ -348,7 +412,7 @@ Workflow example:
 			deployURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/deploy/%s", client.APIURL(), orgID, confID, version)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, deployURL, nil)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %v", err)
+				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
@@ -362,7 +426,7 @@ Workflow example:
 			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %v", err)
+				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 
 			if resp.StatusCode != http.StatusOK {
@@ -491,13 +555,13 @@ Example node configurations:
 
 			payloadBytes, err := json.Marshal(payload)
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal payload: %v", err)
+				return nil, fmt.Errorf("failed to marshal payload: %w", err)
 			}
 
 			addSourceURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/add_source", client.APIURL(), orgID, confID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, addSourceURL, bytes.NewReader(payloadBytes))
 			if err != nil {
-				return nil, fmt.Errorf("failed to create request: %v", err)
+				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
@@ -511,7 +575,7 @@ Example node configurations:
 			defer resp.Body.Close()
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %v", err)
+				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 
 			if resp.StatusCode != http.StatusOK {
@@ -544,6 +608,8 @@ func SavePipelineTool(client Client) (mcp.Tool, server.ToolHandlerFunc) {
 	description := `Save pipeline configuration. This saves the pipeline YAML content but does NOT deploy it.
 After saving, use get_pipeline_history to get the latest version timestamp, then use deploy_pipeline to deploy.
 
+TIP: If unsure about field names for a node type, call get_pipeline_config on an existing pipeline that uses that node type and match its YAML structure exactly.
+
 IMPORTANT pipeline v3 requirements:
 - 'version: v3' MUST be the first line
 - 'settings.tag' is required (pipeline identifier)
@@ -557,7 +623,43 @@ IMPORTANT pipeline v3 requirements:
 - No Unicode characters in YAML comments (no arrows, checkmarks)
 - json_field_path must use '$' not '.' as root
 
-Use get_pipeline_config first to see the current format if unsure.`
+NODE TYPE FIELD REFERENCE (common mistakes cause cryptic 500 errors):
+
+http_pull_input:
+  name: my_source
+  type: http_pull_input
+  method: GET
+  endpoint: "https://api.example.com/data"  # NOT 'url:'
+  pull_interval: 10m                         # NOT 'interval:'
+  headers:                                   # MUST be array, NOT map
+  - header: Accept
+    value: application/json
+  - header: Authorization
+    value: "Bearer {{env:MY_TOKEN}}"
+
+http_workflow_input:
+  name: my_workflow
+  type: http_workflow_input
+  workflow_pull_interval: 5m                 # NOT 'interval:' or 'pull_interval:'
+  steps:                                     # NOT 'initial_request:'
+  - name: fetch_data
+    method: GET
+    endpoint: "https://api.example.com/data"
+    headers:
+      Accept: application/json
+    is_last_step: true
+
+lookup (processor inside sequence):
+  - type: lookup
+    location_path: "ed://my-lookup.csv"
+    reload_period: 5m
+    match_mode: exact
+    key_fields:
+    - event_field: resource["source.api_name"]
+      lookup_field: api_name
+    out_fields:
+    - event_field: attributes["_enriched"]
+      lookup_field: enrichment_value`
 
 	return mcp.NewTool("save_pipeline",
 			mcp.WithTitleAnnotation("Save Pipeline"),
