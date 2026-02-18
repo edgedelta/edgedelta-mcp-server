@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/params"
 
@@ -594,8 +595,19 @@ Use get_pipeline_config first to see the current format if unsure.`
 				return mcp.NewToolResultError("missing required parameter: description"), err
 			}
 
+			// Pre-flight validation to catch common errors with clear messages
+			validation := validatePipelineYAML(content)
+			if !validation.Valid {
+				validationJSON, _ := json.Marshal(validation)
+				return mcp.NewToolResultError(fmt.Sprintf("Pipeline validation failed (not sent to API). Fix these errors and retry:\n%s", string(validationJSON))), nil
+			}
+
 			result, err := SavePipeline(ctx, client, confID, desc, "", content)
 			if err != nil {
+				// Enhance the unhelpful 500 "Failed to read request content" error
+				if strings.Contains(err.Error(), "Failed to read request content") {
+					return nil, fmt.Errorf("API rejected the pipeline YAML (500). The YAML passed client-side validation but the server's strict parser rejected it. Common causes: wrong field names for the node type (e.g. 'url' instead of 'endpoint' for http_pull_input), headers as a map instead of array of {header, value} objects, or missing required node-specific fields. Use get_pipeline_config on a working pipeline to see the correct field format. Original error: %w", err)
+				}
 				return nil, fmt.Errorf("failed to save pipeline: %w", err)
 			}
 

@@ -60,6 +60,7 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.DeployPipelineTool(client))
 	s.AddTool(tools.AddPipelineSourceTool(client))
 	s.AddTool(tools.SavePipelineTool(client))
+	s.AddTool(tools.ValidatePipelineTool())
 
 	// Facet tools
 	s.AddTool(tools.FacetsTool, tools.FacetsToolHandler(client))
