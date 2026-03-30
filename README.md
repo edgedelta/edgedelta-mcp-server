@@ -52,6 +52,10 @@ docker buildx build --load -t mcp/edgedelta .
 > ℹ️  The `--load` flag streams the image back to your local Docker engine so you can
 > run it directly with `docker run mcp/edgedelta …`.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/edgedelta-edgedelta-mcp-server).
+
 ## Installation
 
 ### Usage with Cursor
