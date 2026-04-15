@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
@@ -57,16 +58,21 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {
+		// Check for Bearer token in Authorization header
+		if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+			ctx = addToContext(ctx, tools.BearerTokenKey, strings.TrimPrefix(authHeader, "Bearer "))
+		}
+
 		// Check for API token in query parameters
 		apiToken := r.URL.Query().Get("token")
 		if apiToken != "" {
-			ctx = addToContext(ctx, tools.TokenKey, apiToken)
+			ctx = addToContext(ctx, tools.EDTokenKey, apiToken)
 		}
 
 		// Check for API token in headers
 		headerToken := r.Header.Get(config.apiTokenHeader)
 		if headerToken != "" {
-			ctx = addToContext(ctx, tools.TokenKey, headerToken)
+			ctx = addToContext(ctx, tools.EDTokenKey, headerToken)
 		}
 
 		// Check for org ID in path variables

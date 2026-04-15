@@ -162,7 +162,7 @@ After viewing config, you can:
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -172,14 +172,14 @@ After viewing config, you can:
 				return mcp.NewToolResultError("missing required parameter: conf_id"), err
 			}
 
-			historyURL := fmt.Sprintf("%s/v1/orgs/%s/confs/%s", client.APIURL(), orgID, confID)
+			historyURL := fmt.Sprintf("%s/v1/orgs/%s/confs/%s", client.APIURL(), keys.OrgID, confID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %w", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -243,7 +243,7 @@ Workflow for deployment:
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -253,14 +253,14 @@ Workflow for deployment:
 				return mcp.NewToolResultError("missing required parameter: conf_id"), err
 			}
 
-			historyURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/history", client.APIURL(), orgID, confID)
+			historyURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/history", client.APIURL(), keys.OrgID, confID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -329,7 +329,7 @@ Workflow example:
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -344,14 +344,14 @@ Workflow example:
 				return mcp.NewToolResultError("missing required parameter: version"), err
 			}
 
-			deployURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/deploy/%s", client.APIURL(), orgID, confID, version)
+			deployURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/deploy/%s", client.APIURL(), keys.OrgID, confID, version)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, deployURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -462,7 +462,7 @@ Example node configurations:
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -493,14 +493,14 @@ Example node configurations:
 				return nil, fmt.Errorf("failed to marshal payload: %v", err)
 			}
 
-			addSourceURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/add_source", client.APIURL(), orgID, confID)
+			addSourceURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/add_source", client.APIURL(), keys.OrgID, confID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, addSourceURL, bytes.NewReader(payloadBytes))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {

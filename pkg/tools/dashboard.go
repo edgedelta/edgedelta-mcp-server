@@ -44,12 +44,12 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			dashboardsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/dashboards", client.APIURL(), orgID))
+			dashboardsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/dashboards", client.APIURL(), keys.OrgID))
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +66,7 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -123,7 +123,7 @@ Returns full dashboard configuration including widget definitions and layout.`),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -133,14 +133,14 @@ Returns full dashboard configuration including widget definitions and layout.`),
 				return mcp.NewToolResultError("missing required parameter: dashboard_id"), err
 			}
 
-			dashboardURL := fmt.Sprintf("%s/v1/orgs/%s/dashboards/%s", client.APIURL(), orgID, dashboardID)
+			dashboardURL := fmt.Sprintf("%s/v1/orgs/%s/dashboards/%s", client.APIURL(), keys.OrgID, dashboardID)
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, dashboardURL, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create request: %v", err)
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {

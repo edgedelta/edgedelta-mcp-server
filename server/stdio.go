@@ -47,7 +47,7 @@ func NewStdioServer(orgID, apiToken string, opts ...ServerOption) (*MCPServer, e
 	stdioServer := server.NewStdioServer(s)
 	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
 		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
-		ctx = context.WithValue(ctx, tools.TokenKey, apiToken)
+		ctx = context.WithValue(ctx, tools.EDTokenKey, apiToken)
 		return ctx
 	})
 
