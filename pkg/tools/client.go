@@ -52,15 +52,23 @@ type authedTransport struct {
 }
 
 func (t *authedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.apiTokenHeader == "" {
-		return t.Transport.RoundTrip(req)
-	}
-
-	if token, ok := tokenKeyFromContext(req.Context()); ok {
-		req.Header.Set(t.apiTokenHeader, token)
+	ctx := req.Context()
+	if oauthToken, _ := ctx.Value(BearerTokenKey).(string); oauthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+oauthToken)
+	} else if edToken, _ := ctx.Value(EDTokenKey).(string); edToken != "" {
+		req.Header.Set("X-ED-API-Token", edToken)
 	}
 
 	return t.Transport.RoundTrip(req)
+}
+
+// applyAuthHeader sets the appropriate auth header on req. OAuth token takes precedence over ED token.
+func applyAuthHeader(req *http.Request, keys *ContextKeys) {
+	if keys.BearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+keys.BearerToken)
+	} else if keys.EDToken != "" {
+		req.Header.Set("X-ED-API-Token", keys.EDToken)
+	}
 }
 
 type HTTPClient struct {
@@ -90,17 +98,17 @@ func (c *HTTPClient) APIURL() string {
 }
 
 func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...QueryParamOption) ([]PipelineSummary, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	pipelineURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines", client.APIURL(), orgID))
+	pipelineURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines", client.APIURL(), keys.OrgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := createRequest(ctx, pipelineURL, token)
+	req, err := createRequest(ctx, pipelineURL, keys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pipelines request, err: %v", err)
 	}
@@ -202,12 +210,12 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 }
 
 func SavePipeline(ctx context.Context, client Client, confID, description, pipeline, content string) (map[string]any, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	saveURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/save", client.APIURL(), orgID, confID))
+	saveURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/save", client.APIURL(), keys.OrgID, confID))
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +247,7 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
+	applyAuthHeader(req, keys)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -261,17 +269,17 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 }
 
 func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]Facet, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", client.APIURL(), orgID))
+	facetsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facets", client.APIURL(), keys.OrgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := createRequest(ctx, facetsURL, token, opts...)
+	req, err := createRequest(ctx, facetsURL, keys, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create facets request: %v", err)
 	}
@@ -300,17 +308,17 @@ func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]
 }
 
 func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOption) (*Facet, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", client.APIURL(), orgID))
+	facetURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_options", client.APIURL(), keys.OrgID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := createRequest(ctx, facetURL, token, opts...)
+	req, err := createRequest(ctx, facetURL, keys, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create facet options request: %v", err)
 	}
@@ -334,21 +342,7 @@ func GetFacetOptions(ctx context.Context, client Client, opts ...QueryParamOptio
 	return &facet, nil
 }
 
-func tokenKeyFromContext(ctx context.Context) (string, bool) {
-	value := ctx.Value(TokenKey)
-	if value == nil {
-		return "", false
-	}
-
-	token, ok := value.(string)
-	if !ok {
-		return "", false
-	}
-
-	return token, true
-}
-
-func createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...QueryParamOption) (*http.Request, error) {
+func createRequest(ctx context.Context, reqUrl *url.URL, keys *ContextKeys, opts ...QueryParamOption) (*http.Request, error) {
 	queryValues := url.Values{}
 	for _, opt := range opts {
 		opt(queryValues)
@@ -361,6 +355,6 @@ func createRequest(ctx context.Context, reqUrl *url.URL, token string, opts ...Q
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
+	applyAuthHeader(req, keys)
 	return req, nil
 }

@@ -62,13 +62,13 @@ Common fields: event.type, event.domain, service.name, ed.monitor.type.`),
 )
 
 func GetFacetKeys(ctx context.Context, client Client, scope string, opts ...QueryParamOption) ([]FacetKey, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build the facet_keys API URL
-	facetKeysURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_keys", client.APIURL(), orgID))
+	facetKeysURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/facet_keys", client.APIURL(), keys.OrgID))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func GetFacetKeys(ctx context.Context, client Client, scope string, opts ...Quer
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
+	applyAuthHeader(req, keys)
 
 	resp, err := client.Do(req)
 	if err != nil {

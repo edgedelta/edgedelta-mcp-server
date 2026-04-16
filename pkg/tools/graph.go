@@ -137,13 +137,13 @@ Use "*" for all logs. Verify fields with discover_schema tool first.`),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			// Build query parameters
-			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), keys.OrgID))
 			if err != nil {
 				return nil, err
 			}
@@ -202,7 +202,7 @@ Use "*" for all logs. Verify fields with discover_schema tool first.`),
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -293,13 +293,13 @@ Use "*" for no filter. Verify field values with facet_options.`),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			// Build query parameters
-			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), keys.OrgID))
 			if err != nil {
 				return nil, err
 			}
@@ -390,7 +390,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -475,13 +475,13 @@ NOTE: Full-text search is NOT supported for traces.`),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			// Build query parameters
-			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), keys.OrgID))
 			if err != nil {
 				return nil, err
 			}
@@ -553,7 +553,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -649,13 +649,13 @@ Use "*" for all patterns. Verify fields with discover_schema tool first.`),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			orgID, token, err := FetchContextKeys(ctx)
+			keys, err := FetchContextKeys(ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			// Build query parameters
-			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), orgID))
+			searchURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/graph", client.APIURL(), keys.OrgID))
 			if err != nil {
 				return nil, err
 			}
@@ -744,7 +744,7 @@ Use "*" for all patterns. Verify fields with discover_schema tool first.`),
 			}
 
 			req.Header.Add("Content-Type", "application/json")
-			req.Header.Add("X-ED-API-Token", token)
+			applyAuthHeader(req, keys)
 
 			resp, err := client.Do(req)
 			if err != nil {

@@ -44,13 +44,13 @@ Services can be used to filter logs, metrics, traces, patterns, and events using
 )
 
 func GetServices(ctx context.Context, client Client, opts ...QueryParamOption) ([]Service, error) {
-	orgID, token, err := FetchContextKeys(ctx)
+	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build the graph API URL with query parameters
-	graphURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/graph", client.APIURL(), orgID))
+	graphURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/logs/log_search/graph", client.APIURL(), keys.OrgID))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func GetServices(ctx context.Context, client Client, opts ...QueryParamOption) (
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-ED-API-Token", token)
+	applyAuthHeader(req, keys)
 
 	resp, err := client.Do(req)
 	if err != nil {
