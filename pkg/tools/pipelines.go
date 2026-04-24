@@ -16,10 +16,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-const (
-	defaultLookbackDaysForGetPipelines = 7
-)
-
 type PipelineToolResponse struct {
 	Data     json.RawMessage   `json:"data"`
 	Guidance *PipelineGuidance `json:"guidance,omitempty"`
@@ -47,6 +43,14 @@ func WithLimit(limit string) QueryParamOption {
 	}
 }
 
+func WithOffset(offset string) QueryParamOption {
+	return func(v url.Values) {
+		if offset != "" {
+			v.Add("offset", offset)
+		}
+	}
+}
+
 // GetPipelinesTool creates a tool to search for pipelines.
 func GetPipelinesTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipelines",
@@ -62,16 +66,16 @@ WORKFLOW: This is the starting point for pipeline operations.
 
 Returns recently updated pipelines with their conf_id (configuration ID) which is required for all other pipeline operations.`),
 			mcp.WithNumber("limit",
-				mcp.Description("Limit number of results, default is 5 and max is 10"),
-				mcp.DefaultNumber(5),
+				mcp.Description("Limit number of results, default is 100 and maximum is 100"),
+				mcp.DefaultNumber(100),
+			),
+			mcp.WithNumber("offset",
+				mcp.Description("Offset for pagination, default is 0"),
+				mcp.DefaultNumber(0),
 			),
 			mcp.WithString("keyword",
 				mcp.Description("Keyword to filter pipelines if provided should be in the pipeline tag"),
 				mcp.DefaultString(""),
-			),
-			mcp.WithNumber("lookback_days",
-				mcp.Description("Lookback days to get pipelines, default is 7"),
-				mcp.DefaultNumber(7),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithIdempotentHintAnnotation(true),
@@ -84,19 +88,14 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 				return nil, fmt.Errorf("failed to get limit, err: %w", err)
 			}
 
+			offset, err := params.Optional[float64](request, "offset")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get offset, err: %w", err)
+			}
+
 			keyword, err := params.Optional[string](request, "keyword")
 			if err != nil {
 				return nil, fmt.Errorf("failed to get keyword, err: %w", err)
-			}
-
-			lookbackDays, err := params.Optional[float64](request, "lookback_days")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get lookback_days, err: %w", err)
-			}
-
-			lookbackDaysVal := defaultLookbackDaysForGetPipelines
-			if lookbackDays > 0 {
-				lookbackDaysVal = int(lookbackDays)
 			}
 
 			limitStr := ""
@@ -104,7 +103,12 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 				limitStr = strconv.Itoa(int(limit))
 			}
 
-			result, err := GetPipelines(ctx, client, lookbackDaysVal, WithLimit(limitStr), WithKeyword(keyword))
+			offsetStr := ""
+			if offset > 0 {
+				offsetStr = strconv.Itoa(int(offset))
+			}
+
+			result, err := GetPipelines(ctx, client, WithLimit(limitStr), WithOffset(offsetStr), WithKeyword(keyword))
 			if err != nil {
 				return nil, fmt.Errorf("failed to get pipelines, err: %w", err)
 			}

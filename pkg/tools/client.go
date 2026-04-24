@@ -97,7 +97,7 @@ func (c *HTTPClient) APIURL() string {
 	return c.apiURL
 }
 
-func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...QueryParamOption) ([]PipelineSummary, error) {
+func GetPipelines(ctx context.Context, client Client, opts ...QueryParamOption) ([]PipelineSummary, error) {
 	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -142,9 +142,17 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 	limitStr := queryValues.Get("limit")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		limit = 5
-	} else if limit > 10 {
-		limit = 10
+		limit = 100
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	offsetStr := queryValues.Get("offset")
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		offset = 0
+	} else if offset < 0 {
+		offset = 0
 	}
 
 	forcedAdd := make(map[string]bool)
@@ -154,7 +162,6 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 		}
 	}
 
-	lookbackCutoff := time.Now().UTC().AddDate(0, 0, -lookbackDays)
 	returnPipelines := make([]PipelineSummary, 0)
 	for _, pipeline := range pipelines {
 		if forcedAdd[pipeline.ID] {
@@ -181,12 +188,6 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 			continue
 		}
 
-		// filter out not updated in last lookbackDays days
-		updatedTime, err := time.Parse(StorageTimeFormat, pipeline.Updated)
-		if err != nil || updatedTime.IsZero() || updatedTime.Before(lookbackCutoff) {
-			continue
-		}
-
 		returnPipelines = append(returnPipelines, PipelineSummary{
 			ID:          pipeline.ID,
 			Tag:         pipeline.Tag,
@@ -199,6 +200,14 @@ func GetPipelines(ctx context.Context, client Client, lookbackDays int, opts ...
 			FleetType:   pipeline.FleetType,
 			Status:      pipeline.Status,
 		})
+	}
+
+	if offset > 0 {
+		if offset >= len(returnPipelines) {
+			return []PipelineSummary{}, nil
+		}
+
+		returnPipelines = returnPipelines[offset:]
 	}
 
 	// limit the number of pipelines to return
