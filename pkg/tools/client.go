@@ -367,3 +367,110 @@ func createRequest(ctx context.Context, reqUrl *url.URL, keys *ContextKeys, opts
 	applyAuthHeader(req, keys)
 	return req, nil
 }
+
+func ListConfs(ctx context.Context, client Client) ([]*ConfSummary, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	confsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/confs", client.APIURL(), keys.OrgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, confsURL, keys, func(v url.Values) {
+		v.Set("empty_contents", "true")
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create confs request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to list confs, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var out []*ConfSummary
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode confs response: %v", err)
+	}
+	return out, nil
+}
+
+func GetIngestionEndpoints(ctx context.Context, client Client) (*IngestionEndpointsResponse, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointsURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/ingestion_endpoints", client.APIURL(), keys.OrgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, endpointsURL, keys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ingestion_endpoints request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get ingestion endpoints, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var out IngestionEndpointsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode ingestion_endpoints response: %v", err)
+	}
+	return &out, nil
+}
+
+func GetIngestionToken(ctx context.Context, client Client, confID, nodeName string) (*IngestionTokenResponse, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/ingestion_token", client.APIURL(), keys.OrgID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, tokenURL, keys, func(v url.Values) {
+		v.Set("conf_id", confID)
+		v.Set("node_name", nodeName)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ingestion_token request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get ingestion token, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var out IngestionTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode ingestion_token response: %v", err)
+	}
+	return &out, nil
+}
