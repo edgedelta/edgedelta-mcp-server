@@ -474,3 +474,37 @@ func GetIngestionToken(ctx context.Context, client Client, confID, nodeName stri
 	}
 	return &out, nil
 }
+
+func GetConf(ctx context.Context, client Client, confID string) (*ConfSummary, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	confURL, err := url.Parse(fmt.Sprintf("%s/v1/orgs/%s/confs/%s", client.APIURL(), keys.OrgID, confID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := createRequest(ctx, confURL, keys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get-conf request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to get conf %s, status code %d: %s", confID, resp.StatusCode, string(bodyBytes))
+	}
+
+	var out ConfSummary
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode conf response: %v", err)
+	}
+	return &out, nil
+}

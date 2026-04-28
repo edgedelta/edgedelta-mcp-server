@@ -100,4 +100,5 @@ type ConfSummary struct {
 	ID        string    `json:"id"`
 	Tag       string    `json:"tag"`
 	FleetType FleetType `json:"fleet_type"`
+	Content   string    `json:"content,omitempty"`
 }
