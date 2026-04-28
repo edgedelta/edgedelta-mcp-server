@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	ingestionPipelineTag    = "AI-Connector-Telemetry-Pipeline"
-	httpIngestionInputType  = "http_ingestion_input"
+	ingestionPipelineTag   = "AI-Connector-Telemetry-Pipeline"
+	httpIngestionInputType = "http_ingestion_input"
 )
 
 type ingestionEndpointOut struct {
@@ -107,30 +107,30 @@ func resolvePipeline(
 	detail, err := GetConf(ctx, client, c.ID)
 	if err != nil {
 		return []ingestionPipelineOut{{
-			ConfID:    c.ID,
-			Name:      c.Tag,
-			Default:   isDefault,
-			Error:     fmt.Sprintf("failed to fetch pipeline content: %v", err),
+			ConfID:  c.ID,
+			Name:    c.Tag,
+			Default: isDefault,
+			Error:   fmt.Sprintf("failed to fetch pipeline content: %v", err),
 		}}
 	}
 
 	nodeNames := findHTTPIngestNodeNames(detail.Content)
 	if len(nodeNames) == 0 {
 		return []ingestionPipelineOut{{
-			ConfID:    c.ID,
-			Name:      c.Tag,
-			Default:   isDefault,
-			Error:     fmt.Sprintf("no %q nodes in this pipeline", httpIngestionInputType),
+			ConfID:  c.ID,
+			Name:    c.Tag,
+			Default: isDefault,
+			Error:   fmt.Sprintf("no %q nodes in this pipeline", httpIngestionInputType),
 		}}
 	}
 
 	out := make([]ingestionPipelineOut, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
 		entry := ingestionPipelineOut{
-			ConfID:    c.ID,
-			Name:      c.Tag,
-			NodeName:  nodeName,
-			Default:   isDefault,
+			ConfID:   c.ID,
+			Name:     c.Tag,
+			NodeName: nodeName,
+			Default:  isDefault,
 		}
 		tokenResp, err := GetIngestionToken(ctx, client, c.ID, nodeName)
 		if err != nil {
