@@ -11,10 +11,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// These mirror backend constants for the default auto-provisioned ingestion
-// pipeline every org is given on creation:
-//   - backend/provision/ingestpipeline/provisioner.go  (defaultIngestPipelineName)
-//   - deploy/modules/knowledge/base_config_ingestion_pipeline.yml  (node name)
 const (
 	ingestionPipelineTag  = "AI-Connector-Telemetry-Pipeline"
 	httpIngestionNodeName = "http_ingestion_input"
