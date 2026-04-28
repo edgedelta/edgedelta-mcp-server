@@ -43,9 +43,10 @@ const (
 type FleetType string
 
 const (
-	EdgeFleetType    FleetType = "Edge"
-	CloudFleetType   FleetType = "Cloud"
-	GatewayFleetType FleetType = "Gateway"
+	EdgeFleetType              FleetType = "Edge"
+	CloudFleetType             FleetType = "Cloud"
+	GatewayFleetType           FleetType = "Gateway"
+	IngestionPipelineFleetType FleetType = "IngestionPipeline"
 )
 
 // FleetStatus represents the status of a fleet
@@ -68,4 +69,36 @@ type PipelineSummary struct {
 	Environment EnvironmentType `json:"environment,omitempty"`
 	FleetType   FleetType       `json:"fleet_type,omitempty"`
 	Status      FleetStatus     `json:"status,omitempty"`
+}
+
+// IngestionEndpointsResponse mirrors the backend response from
+// GET /v1/orgs/{org_id}/ingestion_endpoints
+type IngestionEndpointsResponse struct {
+	HTTPS *HTTPSIngestionEndpoints `json:"https,omitempty"`
+}
+
+type HTTPSIngestionEndpoints struct {
+	BaseURL         string            `json:"base_url"`
+	PathForDataType map[string]string `json:"path_for_data_type"`
+	SampleData      map[string]string `json:"sample_data"`
+	TestCommands    map[string]string `json:"test_commands"`
+}
+
+// IngestionTokenResponse mirrors the backend response from
+// GET /v1/orgs/{org_id}/ingestion_token
+type IngestionTokenResponse struct {
+	RawToken string `json:"raw_token"`
+	TokenID  string `json:"token_id"`
+	OrgID    string `json:"org_id"`
+	ConfID   string `json:"conf_id"`
+	NodeName string `json:"node_name"`
+}
+
+// ConfSummary mirrors the fields of backend/core.Conf that this package uses.
+// The backend endpoint returns more fields; we only decode what we need.
+type ConfSummary struct {
+	ID        string    `json:"id"`
+	Tag       string    `json:"tag"`
+	FleetType FleetType `json:"fleet_type"`
+	Content   string    `json:"content,omitempty"`
 }
