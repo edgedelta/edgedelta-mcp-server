@@ -98,3 +98,49 @@ func TestValidatePipelineConfigTool_MissingContent(t *testing.T) {
 		t.Fatalf("expected error result for missing content, got %+v", res)
 	}
 }
+
+// --- save_pipeline_config ---
+
+func TestSavePipelineConfigTool(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"version":"1752190141312"}`))
+	}))
+	defer srv.Close()
+
+	_, handler := SavePipelineConfigTool(newTestClient(srv.URL))
+	res, err := handler(testCtx(), callToolRequest(map[string]any{
+		"conf_id":     "abc123",
+		"content":     "nodes: []",
+		"description": "restore severity",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %s, want POST", gotMethod)
+	}
+	if gotPath != "/v1/orgs/org123/pipelines/abc123/save" {
+		t.Errorf("path = %s, want .../pipelines/abc123/save", gotPath)
+	}
+	if !strings.Contains(gotBody, `"content":"nodes: []"`) || !strings.Contains(gotBody, `"description":"restore severity"`) {
+		t.Errorf("body = %s, want content+description", gotBody)
+	}
+	text := resultText(t, res)
+	if !strings.Contains(text, "1752190141312") || !strings.Contains(text, "deploy_pipeline") {
+		t.Errorf("result = %s, want version echoed and deploy guidance", text)
+	}
+}
+
+func TestSavePipelineConfigTool_MissingConfID(t *testing.T) {
+	_, handler := SavePipelineConfigTool(newTestClient("http://unused"))
+	res, _ := handler(testCtx(), callToolRequest(map[string]any{"content": "x"}))
+	if res == nil || !res.IsError {
+		t.Fatalf("expected error result for missing conf_id, got %+v", res)
+	}
+}
