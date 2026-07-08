@@ -26,20 +26,6 @@ func TestPipelineOTTL(ctx context.Context, client Client, confID, statements str
 	return doCaptureJSON(ctx, client, http.MethodPost, base+"/pipelines/"+confID+"/test/ottl", payload)
 }
 
-// TestPipelineGrok dry-runs a grok pattern against sample raw log lines without saving or
-// deploying any pipeline configuration.
-func TestPipelineGrok(ctx context.Context, client Client, confID, pattern string, logs []string) (json.RawMessage, error) {
-	base, _, err := orgBase(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-	payload, err := json.Marshal(map[string]any{"logs": logs, "pattern": pattern})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal test-grok payload: %w", err)
-	}
-	return doCaptureJSON(ctx, client, http.MethodPost, base+"/pipelines/"+confID+"/test/grok", payload)
-}
-
 // stringArrayParam extracts a required array-of-strings parameter from the request arguments.
 func stringArrayParam(request mcp.CallToolRequest, name string) ([]string, error) {
 	raw, exists := request.GetArguments()[name]
@@ -127,76 +113,6 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
 						"Compare the returned items against your input items to confirm the OTTL statements produced the expected transformation.",
 						"Once the statements produce the right output, put them in an ottl_transform node and call save_pipeline_config.",
 						"After saving and deploying, verify on live traffic with start_pipeline_capture / get_pipeline_capture_results.",
-					},
-				},
-			}
-
-			r, err := json.Marshal(response)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
-			}
-			return mcp.NewToolResultText(string(r)), nil
-		}
-}
-
-// TestPipelineGrokTool creates a tool that dry-runs a grok pattern against sample raw log lines.
-func TestPipelineGrokTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
-	return mcp.NewTool("test_pipeline_grok",
-			mcp.WithTitleAnnotation("Test Pipeline Grok"),
-			mcp.WithDescription(`Dry-run a grok pattern against sample raw log lines WITHOUT saving or deploying any
-pipeline configuration. This is the offline complement to live-capture — use it to develop
-and verify field extraction before it ever touches real traffic.
-
-'pattern' is a grok pattern, e.g. %{COMMONAPACHELOG}. 'logs' are raw log lines to match
-against it. The response's "structuredLogs" contains one object of extracted field/value
-pairs per input log line — inspect it to confirm the pattern extracts the fields you expect.
-
-PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
-			mcp.WithString("conf_id",
-				mcp.Description("Config ID of the pipeline. Get this from get_pipelines response."),
-				mcp.Required(),
-			),
-			mcp.WithString("pattern",
-				mcp.Description("Grok pattern to apply, e.g. %{COMMONAPACHELOG}."),
-				mcp.Required(),
-			),
-			mcp.WithArray("logs",
-				mcp.Description("Sample raw log lines to match against the grok pattern."),
-				mcp.WithStringItems(),
-				mcp.Required(),
-			),
-			mcp.WithReadOnlyHintAnnotation(true),
-			mcp.WithIdempotentHintAnnotation(true),
-			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithOpenWorldHintAnnotation(false),
-		),
-		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			confID, err := request.RequireString("conf_id")
-			if err != nil {
-				return mcp.NewToolResultError("missing required parameter: conf_id"), nil
-			}
-			pattern, err := request.RequireString("pattern")
-			if err != nil {
-				return mcp.NewToolResultError("missing required parameter: pattern"), nil
-			}
-			logs, err := stringArrayParam(request, "logs")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
-
-			bodyBytes, err := TestPipelineGrok(ctx, client, confID, pattern, logs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to test pipeline grok, err: %w", err)
-			}
-
-			response := PipelineToolResponse{
-				Data: bodyBytes,
-				Guidance: &PipelineGuidance{
-					ResultStatus: "success",
-					NextSteps: []string{
-						"Inspect structuredLogs to confirm the pattern extracted the fields you expect from each log line.",
-						"Once the pattern extracts the right fields, use a grok node (field \"pattern\") in the pipeline and call save_pipeline_config, then deploy_pipeline.",
-						"Verify on live traffic with start_pipeline_capture / get_pipeline_capture_results.",
 					},
 				},
 			}
