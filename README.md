@@ -28,6 +28,24 @@ Typical edit flow: `get_pipeline_config` → edit YAML → `validate_pipeline_co
 → `save_pipeline_config` → `get_pipeline_history` → `deploy_pipeline`
 (`revert_pipeline` to roll back).
 
+### Live-capture tools
+
+Validating that a config is *valid* is not the same as confirming a change
+actually *transformed the data*. The live-capture tools sample real
+before/after data flowing through pipeline nodes on running agents, so an agent
+can verify a transformation took effect.
+
+| Tool | What it does |
+|------|--------------|
+| `start_pipeline_capture` | Start a capture task on a pipeline (duration, optional node list, max items). |
+| `get_pipeline_capture_status` | Poll per-agent status for a capture task. |
+| `get_pipeline_capture_results` | Fetch captured before/after samples per node. |
+| `get_pipeline_capture_task` | Show the currently active capture task, if any. |
+
+Capture flow: `start_pipeline_capture` → `get_pipeline_capture_status` (poll until
+an agent reports `success`) → `get_pipeline_capture_results` (compare each node's
+`before` vs `after` to confirm the transformation).
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.
