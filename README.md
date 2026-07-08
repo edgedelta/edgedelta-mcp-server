@@ -46,6 +46,21 @@ Capture flow: `start_pipeline_capture` → `get_pipeline_capture_status` (poll u
 an agent reports `success`) → `get_pipeline_capture_results` (compare each node's
 `before` vs `after` to confirm the transformation).
 
+### Processor dry-run (test) tools
+
+Develop and verify a processor against sample logs **offline** — no save, no
+deploy, no live traffic. The offline complement to live-capture: capture proves
+what *did* happen, these prove what *will* happen.
+
+| Tool | What it does |
+|------|--------------|
+| `test_pipeline_ottl` | Dry-run OTTL statements against sample OTEL log items; returns the transformed items. |
+| `test_pipeline_grok` | Dry-run a grok pattern against sample raw log lines; returns the extracted fields. |
+
+Iterate `test_pipeline_ottl` / `test_pipeline_grok` until the output is right,
+then put the statements/pattern into a node, `save_pipeline_config` →
+`deploy_pipeline`, and confirm on live data with the capture tools.
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.
