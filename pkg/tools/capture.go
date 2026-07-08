@@ -98,6 +98,7 @@ Workflow:
 			),
 			mcp.WithArray("nodes",
 				mcp.Description("Node names to capture. Omit or leave empty to capture all nodes."),
+				mcp.WithStringItems(),
 			),
 			mcp.WithNumber("max_items",
 				mcp.Description("Maximum number of captured items. Default 20, clamped to [1, 100]."),
