@@ -59,6 +59,19 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 	s.AddTool(tools.GetPipelineHistoryTool(client))
 	s.AddTool(tools.DeployPipelineTool(client))
 	s.AddTool(tools.AddPipelineSourceTool(client))
+	s.AddTool(tools.ValidatePipelineConfigTool(client))
+	s.AddTool(tools.SavePipelineConfigTool(client))
+	s.AddTool(tools.RevertPipelineTool(client))
+
+	// Pipeline live-capture tools
+	s.AddTool(tools.StartPipelineCaptureTool(client))
+	s.AddTool(tools.GetPipelineCaptureStatusTool(client))
+	s.AddTool(tools.GetPipelineCaptureResultsTool(client))
+	s.AddTool(tools.GetPipelineCaptureTaskTool(client))
+
+	// Pipeline processor dry-run (test) tools
+	s.AddTool(tools.TestPipelineOTTLTool(client))
+	s.AddTool(tools.TestPipelineNodeTool(client))
 
 	// Ingestion tools
 	s.AddTool(tools.GetIngestionEndpointTool(client))

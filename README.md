@@ -9,6 +9,60 @@ automation and interaction capabilities for developers and tools.
 - Extract and analyse observability data from Edge Delta.
 - Build AI‑powered tools and applications that interact with Edge Delta’s platform.
 
+
+## Pipeline Configuration Tools
+
+The server exposes tools to inspect and change Edge Delta pipelines. Write
+operations follow a safe loop: **validate → save → deploy**, with rollback.
+
+| Tool | What it does |
+|------|--------------|
+| `get_pipelines` / `get_pipeline_config` / `get_pipeline_history` | Discover pipelines and read their config and version history. |
+| `validate_pipeline_config` | Validate a config YAML without saving it. Returns `{valid, reason}`. |
+| `save_pipeline_config` | Save the full config YAML as a new version (does **not** deploy). |
+| `deploy_pipeline` | Deploy a saved version to the fleet. |
+| `revert_pipeline` | Roll back to a previously saved version. |
+| `add_pipeline_source` | Add a data source node to a pipeline. |
+
+Typical edit flow: `get_pipeline_config` → edit YAML → `validate_pipeline_config`
+→ `save_pipeline_config` → `get_pipeline_history` → `deploy_pipeline`
+(`revert_pipeline` to roll back).
+
+### Live-capture tools
+
+Validating that a config is *valid* is not the same as confirming a change
+actually *transformed the data*. The live-capture tools sample real
+before/after data flowing through pipeline nodes on running agents, so an agent
+can verify a transformation took effect.
+
+| Tool | What it does |
+|------|--------------|
+| `start_pipeline_capture` | Start a capture task on a pipeline (duration, optional node list, max items). |
+| `get_pipeline_capture_status` | Poll per-agent status for a capture task. |
+| `get_pipeline_capture_results` | Fetch captured before/after samples per node. |
+| `get_pipeline_capture_task` | Show the currently active capture task, if any. |
+
+Capture flow: `start_pipeline_capture` → `get_pipeline_capture_status` (poll until
+an agent reports `success`) → `get_pipeline_capture_results` (compare each node's
+`before` vs `after` to confirm the transformation).
+
+### Processor dry-run (test) tools
+
+Develop and verify a processor against sample logs **offline** — no save, no
+deploy, no live traffic. The offline complement to live-capture: capture proves
+what *did* happen, this proves what *will* happen.
+
+| Tool | What it does |
+|------|--------------|
+| `test_pipeline_ottl` | Dry-run OTTL statements against sample OTEL log items; returns the transformed items. |
+| `test_pipeline_node` | Dry-run a full processor node of any type (`log_to_metric`, `log_to_pattern`, `extract_metric`, `parse_json_attributes`, `grok`, `mask`, …); returns the items it emits per output path. |
+
+Iterate until the output is right, then add the statements/node to the pipeline,
+`save_pipeline_config` → `deploy_pipeline`, and confirm on live data with the
+capture tools. Use `test_pipeline_ottl` for OTTL transforms (its `ExtractPatterns`
+also covers regex field extraction); use `test_pipeline_node` for non-OTTL node
+types such as log-to-metric and log-to-pattern.
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.

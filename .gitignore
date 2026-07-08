@@ -1,3 +1,7 @@
 # Mac OS
 .DS_Store
 .env
+
+# Superpowers workflow artifacts (specs, plans, local state)
+docs/superpowers/
+.superpowers/

@@ -542,3 +542,219 @@ Example node configurations:
 			return mcp.NewToolResultText(string(r)), nil
 		}
 }
+
+// ValidatePipelineConfigTool validates an agent config YAML without saving it.
+func ValidatePipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("validate_pipeline_config",
+			mcp.WithTitleAnnotation("Validate Pipeline Config"),
+			mcp.WithDescription(`Validate an Edge Delta pipeline configuration (YAML) WITHOUT saving or deploying it.
+
+Use this as a pre-flight check before save_pipeline_config. Provide the full pipeline YAML as 'content'.
+
+Returns {valid: true} when the config is accepted, or {valid: false, reason: "..."} describing the problem.
+A valid:false result is NOT an error — fix the config and call this tool again.
+
+Typical workflow:
+1. get_pipeline_config(conf_id) → read current YAML
+2. (edit the YAML)
+3. validate_pipeline_config(content) → confirm it is valid
+4. save_pipeline_config(conf_id, content, description) → persist a new version`),
+			mcp.WithString("content",
+				mcp.Description("Full pipeline configuration YAML to validate."),
+				mcp.Required(),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			content, err := request.RequireString("content")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: content"), nil
+			}
+
+			result, err := ValidatePipelineConfig(ctx, client, content)
+			if err != nil {
+				return nil, fmt.Errorf("failed to validate pipeline config, err: %w", err)
+			}
+
+			rawData, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+			}
+
+			guidance := &PipelineGuidance{ResultStatus: "success"}
+			if valid, _ := result["valid"].(bool); valid {
+				guidance.NextSteps = []string{
+					"Config is valid. Use save_pipeline_config with conf_id, content and a description to persist it as a new version.",
+					"After saving, use get_pipeline_history then deploy_pipeline to roll it out.",
+				}
+			} else {
+				guidance.ResultStatus = "invalid"
+				guidance.NextSteps = []string{
+					"Config is invalid. Read the 'reason' field, fix the YAML, and call validate_pipeline_config again.",
+				}
+			}
+
+			r, err := json.Marshal(PipelineToolResponse{Data: rawData, Guidance: guidance})
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}
+
+// SavePipelineConfigTool saves a new pipeline version from full YAML content (does not deploy).
+func SavePipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("save_pipeline_config",
+			mcp.WithTitleAnnotation("Save Pipeline Config"),
+			mcp.WithDescription(`Save a NEW version of a pipeline configuration from full YAML content.
+
+This SAVES a new version but does NOT deploy it — the running fleet is unchanged until you deploy.
+Provide the complete pipeline YAML as 'content' (edit the output of get_pipeline_config).
+
+RECOMMENDED: call validate_pipeline_config(content) first.
+
+Workflow:
+1. get_pipeline_config(conf_id) → current YAML
+2. (edit YAML) → validate_pipeline_config(content)
+3. save_pipeline_config(conf_id, content, description) → new version (NOT deployed)
+4. get_pipeline_history(conf_id) → get the new version timestamp
+5. deploy_pipeline(conf_id, version) → roll out to the fleet`),
+			mcp.WithString("conf_id",
+				mcp.Description("Config ID of the pipeline. Get this from get_pipelines."),
+				mcp.Required(),
+			),
+			mcp.WithString("content",
+				mcp.Description("Full pipeline configuration YAML to save as a new version."),
+				mcp.Required(),
+			),
+			mcp.WithString("description",
+				mcp.Description("Change description shown in version history."),
+				mcp.DefaultString(""),
+			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			confID, err := request.RequireString("conf_id")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: conf_id"), nil
+			}
+			content, err := request.RequireString("content")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: content"), nil
+			}
+			description, err := params.Optional[string](request, "description")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get description, err: %w", err)
+			}
+
+			result, err := SavePipeline(ctx, client, confID, description, "", content)
+			if err != nil {
+				return nil, fmt.Errorf("failed to save pipeline config, err: %w", err)
+			}
+
+			rawData, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+			}
+
+			response := PipelineToolResponse{
+				Data: rawData,
+				Guidance: &PipelineGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"New version saved but NOT deployed.",
+						"Use get_pipeline_history with conf_id to get the new version timestamp.",
+						"Use deploy_pipeline with conf_id and version to roll it out to the fleet.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}
+
+// RevertPipelineTool rolls a pipeline back to a previously saved version.
+func RevertPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("revert_pipeline",
+			mcp.WithTitleAnnotation("Revert Pipeline"),
+			mcp.WithDescription(`Revert a pipeline to a previously saved version.
+
+This copies the target version's content into a NEW version and does NOT deploy it —
+the running fleet is unchanged until you deploy. To actually roll the fleet back, call
+deploy_pipeline afterwards (or use deploy_pipeline directly on the target version).
+
+PREREQUISITES:
+1. get_pipelines → conf_id
+2. get_pipeline_history(conf_id) → choose a prior version timestamp
+
+The version parameter is the timestamp field from get_pipeline_history.`),
+			mcp.WithString("conf_id",
+				mcp.Description("Config ID of the pipeline."),
+				mcp.Required(),
+			),
+			mcp.WithString("version",
+				mcp.Description("Version timestamp to revert to (from get_pipeline_history), e.g. 1752190141312."),
+				mcp.Required(),
+			),
+			mcp.WithString("description",
+				mcp.Description("Change description shown in version history for the new reverted version."),
+				mcp.DefaultString(""),
+			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			confID, err := request.RequireString("conf_id")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: conf_id"), nil
+			}
+			version, err := request.RequireString("version")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: version"), nil
+			}
+			description, err := params.Optional[string](request, "description")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get description, err: %w", err)
+			}
+
+			result, err := RevertPipeline(ctx, client, confID, version, description)
+			if err != nil {
+				return nil, fmt.Errorf("failed to revert pipeline, err: %w", err)
+			}
+
+			rawData, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+			}
+
+			response := PipelineToolResponse{
+				Data: rawData,
+				Guidance: &PipelineGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"Reverted content saved as a NEW version (not deployed).",
+						"Use get_pipeline_history to get the new version timestamp.",
+						"Use deploy_pipeline with that version to roll it out to the fleet.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}

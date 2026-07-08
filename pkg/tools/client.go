@@ -277,6 +277,93 @@ func SavePipeline(ctx context.Context, client Client, confID, description, pipel
 	return result, nil
 }
 
+func ValidatePipelineConfig(ctx context.Context, client Client, content string) (map[string]any, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	validateURL := fmt.Sprintf("%s/v1/orgs/%s/confs/validate", client.APIURL(), keys.OrgID)
+
+	payload, err := json.Marshal(map[string]any{"content": content})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validateURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create validate request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	applyAuthHeader(req, keys)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to validate config, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode validate response: %v", err)
+	}
+	return result, nil
+}
+
+func RevertPipeline(ctx context.Context, client Client, confID, version, description string) (map[string]any, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	revertURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/revert/%s", client.APIURL(), keys.OrgID, confID, version)
+
+	// The backend RevertRequest is a single-field object whose value becomes the
+	// description of the newly created (not-deployed) version. An empty/absent body
+	// is rejected with a 400, so a JSON object is always required.
+	payload, err := json.Marshal(map[string]any{"description": description})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal revert payload: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revertURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create revert request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	applyAuthHeader(req, keys)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read revert response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to revert pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	result := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &result); err != nil {
+			// Some endpoints return a non-object body; expose it raw.
+			result = map[string]any{"response": string(bodyBytes)}
+		}
+	}
+	return result, nil
+}
+
 func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]Facet, error) {
 	keys, err := FetchContextKeys(ctx)
 	if err != nil {
