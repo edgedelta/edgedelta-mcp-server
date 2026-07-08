@@ -39,10 +39,11 @@ func resultText(t *testing.T, r *mcp.CallToolResult) string {
 // --- validate_pipeline_config ---
 
 func TestValidatePipelineConfigTool_Valid(t *testing.T) {
-	var gotMethod, gotPath, gotBody string
+	var gotMethod, gotPath, gotBody, gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
 		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("X-ED-API-Token")
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
 		w.WriteHeader(http.StatusOK)
@@ -61,6 +62,9 @@ func TestValidatePipelineConfigTool_Valid(t *testing.T) {
 	if gotPath != "/v1/orgs/org123/confs/validate" {
 		t.Errorf("path = %s, want /v1/orgs/org123/confs/validate", gotPath)
 	}
+	if gotAuth != "tok" {
+		t.Errorf("auth header = %q, want %q", gotAuth, "tok")
+	}
 	if !strings.Contains(gotBody, `"content":"nodes: []"`) {
 		t.Errorf("body = %s, want content field", gotBody)
 	}
@@ -70,6 +74,20 @@ func TestValidatePipelineConfigTool_Valid(t *testing.T) {
 	}
 	if !strings.Contains(text, "guidance") {
 		t.Errorf("result = %s, want guidance", text)
+	}
+}
+
+func TestValidatePipelineConfigTool_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"bad request"}`))
+	}))
+	defer srv.Close()
+
+	_, handler := ValidatePipelineConfigTool(newTestClient(srv.URL))
+	_, err := handler(testCtx(), callToolRequest(map[string]any{"content": "nodes: []"}))
+	if err == nil {
+		t.Fatalf("expected non-nil error for non-2xx response, got nil")
 	}
 }
 
@@ -102,10 +120,11 @@ func TestValidatePipelineConfigTool_MissingContent(t *testing.T) {
 // --- save_pipeline_config ---
 
 func TestSavePipelineConfigTool(t *testing.T) {
-	var gotMethod, gotPath, gotBody string
+	var gotMethod, gotPath, gotBody, gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
 		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("X-ED-API-Token")
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
 		w.WriteHeader(http.StatusOK)
@@ -128,6 +147,9 @@ func TestSavePipelineConfigTool(t *testing.T) {
 	if gotPath != "/v1/orgs/org123/pipelines/abc123/save" {
 		t.Errorf("path = %s, want .../pipelines/abc123/save", gotPath)
 	}
+	if gotAuth != "tok" {
+		t.Errorf("auth header = %q, want %q", gotAuth, "tok")
+	}
 	if !strings.Contains(gotBody, `"content":"nodes: []"`) || !strings.Contains(gotBody, `"description":"restore severity"`) {
 		t.Errorf("body = %s, want content+description", gotBody)
 	}
@@ -148,10 +170,11 @@ func TestSavePipelineConfigTool_MissingConfID(t *testing.T) {
 // --- revert_pipeline ---
 
 func TestRevertPipelineTool(t *testing.T) {
-	var gotMethod, gotPath string
+	var gotMethod, gotPath, gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
 		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("X-ED-API-Token")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"reverted"}`))
 	}))
@@ -170,6 +193,9 @@ func TestRevertPipelineTool(t *testing.T) {
 	}
 	if gotPath != "/v1/orgs/org123/pipelines/abc123/revert/1752190141312" {
 		t.Errorf("path = %s, want .../revert/1752190141312", gotPath)
+	}
+	if gotAuth != "tok" {
+		t.Errorf("auth header = %q, want %q", gotAuth, "tok")
 	}
 	text := resultText(t, res)
 	if !strings.Contains(text, "reverted") || !strings.Contains(text, "guidance") {
