@@ -71,6 +71,7 @@ func AddCustomTools(s *server.MCPServer, client tools.Client) {
 
 	// Pipeline processor dry-run (test) tools
 	s.AddTool(tools.TestPipelineOTTLTool(client))
+	s.AddTool(tools.TestPipelineNodeTool(client))
 
 	// Ingestion tools
 	s.AddTool(tools.GetIngestionEndpointTool(client))

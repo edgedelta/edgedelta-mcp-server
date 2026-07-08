@@ -61,3 +61,50 @@ func TestTestPipelineOTTLTool_MissingStatements(t *testing.T) {
 		t.Fatalf("expected error result for missing statements, got %+v", res)
 	}
 }
+
+// --- test_pipeline_node ---
+
+func TestTestPipelineNodeTool(t *testing.T) {
+	var gotMethod, gotPath, gotBody, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotAuth = r.Method, r.URL.Path, r.Header.Get("X-ED-API-Token")
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"items":{"":["{\"attributes\":{\"tested\":\"yes\"}}"]}}`))
+	}))
+	defer srv.Close()
+
+	_, handler := TestPipelineNodeTool(newTestClient(srv.URL))
+	res, err := handler(testCtx(), callToolRequest(map[string]any{
+		"conf_id": "abc",
+		"node":    map[string]any{"id": "n", "type": "ottl_transform", "configuration": map[string]any{"statements": `set(attributes["tested"],"yes")`}},
+		"items":   []any{`{"body":"x"}`},
+	}))
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method=%s", gotMethod)
+	}
+	if gotPath != "/v1/orgs/org123/pipelines/abc/test/node" {
+		t.Errorf("path=%s", gotPath)
+	}
+	if gotAuth != "tok" {
+		t.Errorf("auth=%q", gotAuth)
+	}
+	if !strings.Contains(gotBody, `"node"`) || !strings.Contains(gotBody, `"configuration"`) || !strings.Contains(gotBody, `"items"`) {
+		t.Errorf("body=%s", gotBody)
+	}
+	if !strings.Contains(resultText(t, res), "tested") {
+		t.Errorf("missing node output")
+	}
+}
+
+func TestTestPipelineNodeTool_MissingNode(t *testing.T) {
+	_, handler := TestPipelineNodeTool(newTestClient("http://unused"))
+	res, _ := handler(testCtx(), callToolRequest(map[string]any{"conf_id": "abc", "items": []any{"x"}}))
+	if res == nil || !res.IsError {
+		t.Fatalf("expected error result for missing node, got %+v", res)
+	}
+}

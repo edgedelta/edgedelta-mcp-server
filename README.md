@@ -55,11 +55,13 @@ what *did* happen, this proves what *will* happen.
 | Tool | What it does |
 |------|--------------|
 | `test_pipeline_ottl` | Dry-run OTTL statements against sample OTEL log items; returns the transformed items. |
+| `test_pipeline_node` | Dry-run a full processor node of any type (`log_to_metric`, `log_to_pattern`, `extract_metric`, `parse_json_attributes`, `grok`, `mask`, …); returns the items it emits per output path. |
 
-Iterate `test_pipeline_ottl` until the output is right, then put the statements
-into an `ottl_transform` node, `save_pipeline_config` → `deploy_pipeline`, and
-confirm on live data with the capture tools. (OTTL's `ExtractPatterns` covers
-regex field extraction, so a separate grok tester isn't needed.)
+Iterate until the output is right, then add the statements/node to the pipeline,
+`save_pipeline_config` → `deploy_pipeline`, and confirm on live data with the
+capture tools. Use `test_pipeline_ottl` for OTTL transforms (its `ExtractPatterns`
+also covers regex field extraction); use `test_pipeline_node` for non-OTTL node
+types such as log-to-metric and log-to-pattern.
 
 ## Prerequisites
 
