@@ -48,7 +48,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -145,8 +144,6 @@ func TestValidatePipelineConfigTool_MissingContent(t *testing.T) {
 		t.Fatalf("expected error result for missing content, got %+v", res)
 	}
 }
-
-var _ = json.Marshal // keep encoding/json imported for later tasks
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
