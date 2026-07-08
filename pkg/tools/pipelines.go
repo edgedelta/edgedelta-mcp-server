@@ -542,3 +542,65 @@ Example node configurations:
 			return mcp.NewToolResultText(string(r)), nil
 		}
 }
+
+// ValidatePipelineConfigTool validates an agent config YAML without saving it.
+func ValidatePipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("validate_pipeline_config",
+			mcp.WithTitleAnnotation("Validate Pipeline Config"),
+			mcp.WithDescription(`Validate an Edge Delta pipeline configuration (YAML) WITHOUT saving or deploying it.
+
+Use this as a pre-flight check before save_pipeline_config. Provide the full pipeline YAML as 'content'.
+
+Returns {valid: true} when the config is accepted, or {valid: false, reason: "..."} describing the problem.
+A valid:false result is NOT an error — fix the config and call this tool again.
+
+Typical workflow:
+1. get_pipeline_config(conf_id) → read current YAML
+2. (edit the YAML)
+3. validate_pipeline_config(content) → confirm it is valid
+4. save_pipeline_config(conf_id, content, description) → persist a new version`),
+			mcp.WithString("content",
+				mcp.Description("Full pipeline configuration YAML to validate."),
+				mcp.Required(),
+			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			content, err := request.RequireString("content")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: content"), nil
+			}
+
+			result, err := ValidatePipelineConfig(ctx, client, content)
+			if err != nil {
+				return nil, fmt.Errorf("failed to validate pipeline config, err: %w", err)
+			}
+
+			rawData, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+			}
+
+			guidance := &PipelineGuidance{ResultStatus: "success"}
+			if valid, _ := result["valid"].(bool); valid {
+				guidance.NextSteps = []string{
+					"Config is valid. Use save_pipeline_config with conf_id, content and a description to persist it as a new version.",
+					"After saving, use get_pipeline_history then deploy_pipeline to roll it out.",
+				}
+			} else {
+				guidance.ResultStatus = "invalid"
+				guidance.NextSteps = []string{
+					"Config is invalid. Read the 'reason' field, fix the YAML, and call validate_pipeline_config again.",
+				}
+			}
+
+			r, err := json.Marshal(PipelineToolResponse{Data: rawData, Guidance: guidance})
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}
