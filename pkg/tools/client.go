@@ -316,7 +316,7 @@ func ValidatePipelineConfig(ctx context.Context, client Client, content string) 
 	return result, nil
 }
 
-func RevertPipeline(ctx context.Context, client Client, confID, version string) (map[string]any, error) {
+func RevertPipeline(ctx context.Context, client Client, confID, version, description string) (map[string]any, error) {
 	keys, err := FetchContextKeys(ctx)
 	if err != nil {
 		return nil, err
@@ -324,7 +324,15 @@ func RevertPipeline(ctx context.Context, client Client, confID, version string) 
 
 	revertURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/revert/%s", client.APIURL(), keys.OrgID, confID, version)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revertURL, nil)
+	// The backend RevertRequest is a single-field object whose value becomes the
+	// description of the newly created (not-deployed) version. An empty/absent body
+	// is rejected with a 400, so a JSON object is always required.
+	payload, err := json.Marshal(map[string]any{"description": description})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal revert payload: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revertURL, strings.NewReader(string(payload)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create revert request: %v", err)
 	}

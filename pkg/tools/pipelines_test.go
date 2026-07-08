@@ -170,11 +170,13 @@ func TestSavePipelineConfigTool_MissingConfID(t *testing.T) {
 // --- revert_pipeline ---
 
 func TestRevertPipelineTool(t *testing.T) {
-	var gotMethod, gotPath, gotAuth string
+	var gotMethod, gotPath, gotAuth, gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMethod = r.Method
 		gotPath = r.URL.Path
 		gotAuth = r.Header.Get("X-ED-API-Token")
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"reverted"}`))
 	}))
@@ -182,8 +184,9 @@ func TestRevertPipelineTool(t *testing.T) {
 
 	_, handler := RevertPipelineTool(newTestClient(srv.URL))
 	res, err := handler(testCtx(), callToolRequest(map[string]any{
-		"conf_id": "abc123",
-		"version": "1752190141312",
+		"conf_id":     "abc123",
+		"version":     "1752190141312",
+		"description": "rollback",
 	}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -196,6 +199,10 @@ func TestRevertPipelineTool(t *testing.T) {
 	}
 	if gotAuth != "tok" {
 		t.Errorf("auth header = %q, want %q", gotAuth, "tok")
+	}
+	// The backend rejects an empty body with 400; a JSON object must always be sent.
+	if !strings.Contains(gotBody, `"description":"rollback"`) {
+		t.Errorf("body = %q, want description field", gotBody)
 	}
 	text := resultText(t, res)
 	if !strings.Contains(text, "reverted") || !strings.Contains(text, "guidance") {

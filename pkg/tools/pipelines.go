@@ -687,9 +687,11 @@ Workflow:
 func RevertPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("revert_pipeline",
 			mcp.WithTitleAnnotation("Revert Pipeline"),
-			mcp.WithDescription(`Roll a pipeline back to a previously saved version.
+			mcp.WithDescription(`Revert a pipeline to a previously saved version.
 
-This is a DESTRUCTIVE operation: it changes what the fleet runs.
+This copies the target version's content into a NEW version and does NOT deploy it —
+the running fleet is unchanged until you deploy. To actually roll the fleet back, call
+deploy_pipeline afterwards (or use deploy_pipeline directly on the target version).
 
 PREREQUISITES:
 1. get_pipelines → conf_id
@@ -704,9 +706,13 @@ The version parameter is the timestamp field from get_pipeline_history.`),
 				mcp.Description("Version timestamp to revert to (from get_pipeline_history), e.g. 1752190141312."),
 				mcp.Required(),
 			),
+			mcp.WithString("description",
+				mcp.Description("Change description shown in version history for the new reverted version."),
+				mcp.DefaultString(""),
+			),
 			mcp.WithReadOnlyHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(false),
-			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(false),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -718,8 +724,12 @@ The version parameter is the timestamp field from get_pipeline_history.`),
 			if err != nil {
 				return mcp.NewToolResultError("missing required parameter: version"), nil
 			}
+			description, err := params.Optional[string](request, "description")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get description, err: %w", err)
+			}
 
-			result, err := RevertPipeline(ctx, client, confID, version)
+			result, err := RevertPipeline(ctx, client, confID, version, description)
 			if err != nil {
 				return nil, fmt.Errorf("failed to revert pipeline, err: %w", err)
 			}
@@ -734,9 +744,9 @@ The version parameter is the timestamp field from get_pipeline_history.`),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
-						"Pipeline reverted to the requested version.",
-						"Use get_pipeline_config to verify the active configuration.",
-						"Use get_pipeline_history to confirm the current deployed version.",
+						"Reverted content saved as a NEW version (not deployed).",
+						"Use get_pipeline_history to get the new version timestamp.",
+						"Use deploy_pipeline with that version to roll it out to the fleet.",
 					},
 				},
 			}
