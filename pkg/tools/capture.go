@@ -45,6 +45,11 @@ func doCaptureJSON(ctx context.Context, client Client, method, url string, paylo
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("capture request failed, status code %d: %s", resp.StatusCode, string(b))
 	}
+	// Some endpoints (e.g. the active-task lookup with no task running) return an
+	// empty body on 200. Normalize to JSON null so the response still marshals.
+	if len(b) == 0 {
+		return []byte("null"), nil
+	}
 	return b, nil
 }
 
