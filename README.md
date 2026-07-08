@@ -9,6 +9,25 @@ automation and interaction capabilities for developers and tools.
 - Extract and analyse observability data from Edge Delta.
 - Build AI‑powered tools and applications that interact with Edge Delta’s platform.
 
+
+## Pipeline Configuration Tools
+
+The server exposes tools to inspect and change Edge Delta pipelines. Write
+operations follow a safe loop: **validate → save → deploy**, with rollback.
+
+| Tool | What it does |
+|------|--------------|
+| `get_pipelines` / `get_pipeline_config` / `get_pipeline_history` | Discover pipelines and read their config and version history. |
+| `validate_pipeline_config` | Validate a config YAML without saving it. Returns `{valid, reason}`. |
+| `save_pipeline_config` | Save the full config YAML as a new version (does **not** deploy). |
+| `deploy_pipeline` | Deploy a saved version to the fleet. |
+| `revert_pipeline` | Roll back to a previously saved version. |
+| `add_pipeline_source` | Add a data source node to a pipeline. |
+
+Typical edit flow: `get_pipeline_config` → edit YAML → `validate_pipeline_config`
+→ `save_pipeline_config` → `get_pipeline_history` → `deploy_pipeline`
+(`revert_pipeline` to roll back).
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.
