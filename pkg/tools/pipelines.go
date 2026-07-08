@@ -682,3 +682,69 @@ Workflow:
 			return mcp.NewToolResultText(string(r)), nil
 		}
 }
+
+// RevertPipelineTool rolls a pipeline back to a previously saved version.
+func RevertPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
+	return mcp.NewTool("revert_pipeline",
+			mcp.WithTitleAnnotation("Revert Pipeline"),
+			mcp.WithDescription(`Roll a pipeline back to a previously saved version.
+
+This is a DESTRUCTIVE operation: it changes what the fleet runs.
+
+PREREQUISITES:
+1. get_pipelines → conf_id
+2. get_pipeline_history(conf_id) → choose a prior version timestamp
+
+The version parameter is the timestamp field from get_pipeline_history.`),
+			mcp.WithString("conf_id",
+				mcp.Description("Config ID of the pipeline."),
+				mcp.Required(),
+			),
+			mcp.WithString("version",
+				mcp.Description("Version timestamp to revert to (from get_pipeline_history), e.g. 1752190141312."),
+				mcp.Required(),
+			),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(false),
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			confID, err := request.RequireString("conf_id")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: conf_id"), nil
+			}
+			version, err := request.RequireString("version")
+			if err != nil {
+				return mcp.NewToolResultError("missing required parameter: version"), nil
+			}
+
+			result, err := RevertPipeline(ctx, client, confID, version)
+			if err != nil {
+				return nil, fmt.Errorf("failed to revert pipeline, err: %w", err)
+			}
+
+			rawData, err := json.Marshal(result)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response, err: %w", err)
+			}
+
+			response := PipelineToolResponse{
+				Data: rawData,
+				Guidance: &PipelineGuidance{
+					ResultStatus: "success",
+					NextSteps: []string{
+						"Pipeline reverted to the requested version.",
+						"Use get_pipeline_config to verify the active configuration.",
+						"Use get_pipeline_history to confirm the current deployed version.",
+					},
+				},
+			}
+
+			r, err := json.Marshal(response)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
+			}
+			return mcp.NewToolResultText(string(r)), nil
+		}
+}

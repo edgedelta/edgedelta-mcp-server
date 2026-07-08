@@ -144,3 +144,43 @@ func TestSavePipelineConfigTool_MissingConfID(t *testing.T) {
 		t.Fatalf("expected error result for missing conf_id, got %+v", res)
 	}
 }
+
+// --- revert_pipeline ---
+
+func TestRevertPipelineTool(t *testing.T) {
+	var gotMethod, gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"reverted"}`))
+	}))
+	defer srv.Close()
+
+	_, handler := RevertPipelineTool(newTestClient(srv.URL))
+	res, err := handler(testCtx(), callToolRequest(map[string]any{
+		"conf_id": "abc123",
+		"version": "1752190141312",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %s, want POST", gotMethod)
+	}
+	if gotPath != "/v1/orgs/org123/pipelines/abc123/revert/1752190141312" {
+		t.Errorf("path = %s, want .../revert/1752190141312", gotPath)
+	}
+	text := resultText(t, res)
+	if !strings.Contains(text, "reverted") || !strings.Contains(text, "guidance") {
+		t.Errorf("result = %s, want status + guidance", text)
+	}
+}
+
+func TestRevertPipelineTool_MissingVersion(t *testing.T) {
+	_, handler := RevertPipelineTool(newTestClient("http://unused"))
+	res, _ := handler(testCtx(), callToolRequest(map[string]any{"conf_id": "abc123"}))
+	if res == nil || !res.IsError {
+		t.Fatalf("expected error result for missing version, got %+v", res)
+	}
+}

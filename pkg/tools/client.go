@@ -316,6 +316,46 @@ func ValidatePipelineConfig(ctx context.Context, client Client, content string) 
 	return result, nil
 }
 
+func RevertPipeline(ctx context.Context, client Client, confID, version string) (map[string]any, error) {
+	keys, err := FetchContextKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	revertURL := fmt.Sprintf("%s/v1/orgs/%s/pipelines/%s/revert/%s", client.APIURL(), keys.OrgID, confID, version)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revertURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create revert request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	applyAuthHeader(req, keys)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read revert response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to revert pipeline, status code %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	result := map[string]any{}
+	if len(bodyBytes) > 0 {
+		if err := json.Unmarshal(bodyBytes, &result); err != nil {
+			// Some endpoints return a non-object body; expose it raw.
+			result = map[string]any{"response": string(bodyBytes)}
+		}
+	}
+	return result, nil
+}
+
 func GetFacets(ctx context.Context, client Client, opts ...QueryParamOption) ([]Facet, error) {
 	keys, err := FetchContextKeys(ctx)
 	if err != nil {
