@@ -51,7 +51,7 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 
 	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
-	s := server.NewMCPServer(config.serverName, config.serverVersion)
+	s := newMCPServer(config)
 
 	AddCustomTools(s, httpClient)
 	AddCustomResources(s, httpClient)

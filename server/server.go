@@ -7,14 +7,21 @@ import (
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 var (
 	defaultServerConfig = serverConfig{
-		apiURL:         "https://api.edgedelta.com",
-		serverName:     "edgedelta-mcp-server",
-		serverVersion:  "0.0.1",
+		apiURL:        "https://api.edgedelta.com",
+		serverName:    "edgedelta-mcp-server",
+		serverVersion: "0.0.1",
+		serverTitle:   "Edge Delta",
+		websiteURL:    "https://edgedelta.com",
+		icons: []mcp.Icon{
+			{Src: "https://app.edgedelta.com/icon-192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
+			{Src: "https://app.edgedelta.com/icon.svg", MIMEType: "image/svg+xml", Sizes: []string{"any"}},
+		},
 		apiTokenHeader: "X-ED-API-Token",
 		logger:         slog.Default(),
 		// HTTP server options
@@ -44,6 +51,14 @@ func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerO
 	default:
 		return nil, fmt.Errorf("invalid server type: %s", serverType)
 	}
+}
+
+func newMCPServer(c serverConfig) *server.MCPServer {
+	return server.NewMCPServer(c.serverName, c.serverVersion,
+		server.WithTitle(c.serverTitle),
+		server.WithWebsiteURL(c.websiteURL),
+		server.WithIcons(c.icons...),
+	)
 }
 
 func AddCustomTools(s *server.MCPServer, client tools.Client) {
@@ -117,6 +132,9 @@ type serverConfig struct {
 	apiURL         string
 	serverName     string
 	serverVersion  string
+	serverTitle    string
+	websiteURL     string
+	icons          []mcp.Icon
 	apiTokenHeader string
 	logger         *slog.Logger
 
