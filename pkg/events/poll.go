@@ -224,8 +224,10 @@ func (h *Handler) search(ctx context.Context, query string, from, to int64, limi
 	if err != nil {
 		return nil, internal(fmt.Sprintf("searching events: %v", err))
 	}
-	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	if closeErr := resp.Body.Close(); err == nil && closeErr != nil {
+		err = closeErr
+	}
 	if err != nil {
 		return nil, internal(fmt.Sprintf("reading events: %v", err))
 	}

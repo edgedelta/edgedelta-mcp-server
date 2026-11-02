@@ -37,17 +37,17 @@ func (it searchItem) id() string {
 	if id := it.Attributes["event.id"]; id != "" {
 		return id
 	}
-	h := sha256.New()
-	fmt.Fprintf(h, "%d\x00%s\x00%s\x00%s\x00%s", it.Timestamp, it.EventDomain, it.EventType, it.SeverityText, it.Body)
+	parts := []string{strconv.FormatInt(it.Timestamp, 10), it.EventDomain, it.EventType, it.SeverityText, it.Body}
 	keys := make([]string, 0, len(it.Resource))
 	for k := range it.Resource {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
 	for _, k := range keys {
-		fmt.Fprintf(h, "\x00%s=%s", k, it.Resource[k])
+		parts = append(parts, k+"="+it.Resource[k])
 	}
-	return "sha256:" + hex.EncodeToString(h.Sum(nil))[:32]
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return "sha256:" + hex.EncodeToString(sum[:])[:32]
 }
 
 func (it searchItem) occurrence(name, appURL string) Occurrence {
