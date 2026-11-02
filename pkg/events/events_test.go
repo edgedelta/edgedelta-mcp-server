@@ -473,7 +473,7 @@ func TestHandle(t *testing.T) {
 			desc:   "has no webhooks yet",
 			body:   `{"jsonrpc":"2.0","id":4,"method":"events/subscribe","params":{"name":"monitor.alert"}}`,
 			status: http.StatusOK,
-			want:   `{"jsonrpc":"2.0","id":4,"error":{"code":-32601,"message":"method \"events/subscribe\" not found"}}`,
+			want:   `{"jsonrpc":"2.0","id":4,"error":{"code":-32601,"message":"webhook delivery is not offered here"}}`,
 		},
 		{
 			desc:   "needs poll params",

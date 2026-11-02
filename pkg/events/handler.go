@@ -20,6 +20,7 @@ const (
 	codeHeaderMismatch = -32020
 	codeNotFound       = -32023
 	codeForbidden      = -32024
+	codeUnsupported    = -32026
 )
 
 // Error is a JSON-RPC error an events/* request answers with.
@@ -44,6 +45,8 @@ func internal(message string) *Error {
 // Handler answers the extension's requests from the org's event search.
 type Handler struct {
 	client    tools.Client
+	store     Store
+	sender    *Sender
 	appURL    string
 	lag       time.Duration
 	maxReplay time.Duration
@@ -99,7 +102,24 @@ type ListResult struct {
 
 // List answers events/list.
 func (h *Handler) List() *ListResult {
-	return &ListResult{ResultType: "complete", Events: eventTypes}
+	types := make([]EventType, 0, len(eventTypes))
+	for _, t := range eventTypes {
+		types = append(types, h.withDelivery(t))
+	}
+	return &ListResult{ResultType: "complete", Events: types}
+}
+
+// withDelivery adds webhooks to a type's delivery modes where there's a store to keep their subscriptions.
+func (h *Handler) withDelivery(t EventType) EventType {
+	if h.store != nil {
+		t.Delivery = []string{"poll", "webhook"}
+	}
+	return t
+}
+
+func (h *Handler) lookupType(name string) (EventType, bool) {
+	t, ok := lookupType(name)
+	return h.withDelivery(t), ok
 }
 
 // Method returns a JSON-RPC message's method, and whether it is a request for this extension.
@@ -155,6 +175,24 @@ func (h *Handler) dispatch(ctx context.Context, req request, mcpName string) (an
 			return nil, e
 		}
 		return h.Poll(ctx, p)
+	case "events/subscribe":
+		var p SubscribeParams
+		if err := unmarshalParams(req.Params, &p); err != nil {
+			return nil, invalidParams(err.Error())
+		}
+		if e := checkMcpName(mcpName, p.Name); e != nil {
+			return nil, e
+		}
+		return h.Subscribe(ctx, p)
+	case "events/unsubscribe":
+		var p UnsubscribeParams
+		if err := unmarshalParams(req.Params, &p); err != nil {
+			return nil, invalidParams(err.Error())
+		}
+		if e := checkMcpName(mcpName, p.Name); e != nil {
+			return nil, e
+		}
+		return h.Unsubscribe(ctx, p)
 	default:
 		return nil, &Error{Code: codeMethodNotFound, Message: fmt.Sprintf("method %q not found", req.Method)}
 	}
