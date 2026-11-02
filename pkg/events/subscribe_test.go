@@ -111,7 +111,9 @@ func (r *receiver) serve(w http.ResponseWriter, req *http.Request) {
 	r.received = append(r.received, msg)
 	if msg["type"] == "verification" {
 		if r.echo {
-			fmt.Fprintf(w, `{"challenge":%q}`, msg["challenge"])
+			if _, err := fmt.Fprintf(w, `{"challenge":%q}`, msg["challenge"]); err != nil {
+				r.t.Errorf("receiver: write: %v", err)
+			}
 		}
 		return
 	}
