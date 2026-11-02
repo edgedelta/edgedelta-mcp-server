@@ -106,6 +106,13 @@ func TestDeliver(t *testing.T) {
 			if s.LastError != run.failing {
 				t.Errorf("%s: run %d: lastError got: %q, want: %q", tc.desc, i, s.LastError, run.failing)
 			}
+			wantNext := now.Add(runInterval)
+			if run.failing != "" {
+				wantNext = now.Add(backoff(s.Attempts))
+			}
+			if !run.want.Ended && !s.NextRun.Equal(wantNext) {
+				t.Errorf("%s: run %d: nextRun got: %v, want: %v", tc.desc, i, s.NextRun, wantNext)
+			}
 			if err := store.Put(context.Background(), s); err != nil {
 				t.Fatalf("%s: put: %v", tc.desc, err)
 			}
@@ -182,6 +189,24 @@ func TestDeliverDualSigns(t *testing.T) {
 		}
 		if diff := cmp.Diff(tc.want, r.types()); diff != "" {
 			t.Errorf("%s: received mismatch (-want, +got): %v", tc.desc, diff)
+		}
+	}
+}
+
+func TestBackoff(t *testing.T) {
+	tests := []struct {
+		attempts int
+		want     time.Duration
+	}{
+		{attempts: 1, want: 30 * time.Second},
+		{attempts: 2, want: time.Minute},
+		{attempts: 5, want: 8 * time.Minute},
+		{attempts: 6, want: maxBackoff},
+		{attempts: 60, want: maxBackoff},
+	}
+	for _, tc := range tests {
+		if got := backoff(tc.attempts); got != tc.want {
+			t.Errorf("attempts %d: got: %v, want: %v", tc.attempts, got, tc.want)
 		}
 	}
 }

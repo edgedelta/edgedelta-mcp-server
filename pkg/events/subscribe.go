@@ -14,9 +14,10 @@ import (
 const (
 	codeCallbackEndpoint = -32027
 
-	defaultTTL      = time.Hour
-	minTTL          = time.Minute
-	maxTTL          = 24 * time.Hour
+	defaultTTL = time.Hour
+	minTTL     = time.Minute
+	// maxTTL is short so a revoked principal, who can't refresh, stops getting events within the hour.
+	maxTTL          = time.Hour
 	verifiedFor     = 24 * time.Hour
 	rotationOverlap = 10 * time.Minute
 )
@@ -55,6 +56,9 @@ type Subscription struct {
 	Active      bool      `json:"active"`
 	LastError   string    `json:"lastError,omitempty"`
 	FailedSince time.Time `json:"failedSince,omitzero"`
+	// NextRun is when Deliver should next run for it, and Attempts how many runs in a row failed.
+	NextRun  time.Time `json:"nextRun"`
+	Attempts int       `json:"attempts,omitempty"`
 }
 
 // Store keeps webhook subscriptions, since the server holds no state of its own.
@@ -212,7 +216,7 @@ func (h *Handler) Subscribe(ctx context.Context, p SubscribeParams) (*SubscribeR
 	now := h.now()
 	s := &Subscription{
 		ID: id, OrgID: orgID, Principal: principal, URL: p.Delivery.URL, Name: p.Name, Arguments: p.Arguments,
-		Secret: p.Delivery.Secret, RefreshBefore: now.Add(ttl), Active: true,
+		Secret: p.Delivery.Secret, RefreshBefore: now.Add(ttl), Active: true, NextRun: now,
 	}
 	result := &SubscribeResult{ResultType: "complete", ID: id, RefreshBefore: s.RefreshBefore.UTC().Format(time.RFC3339Nano)}
 	live := found && existing.RefreshBefore.After(now)
@@ -220,6 +224,9 @@ func (h *Handler) Subscribe(ctx context.Context, p SubscribeParams) (*SubscribeR
 	case live:
 		s.Cursor = existing.Cursor
 		s.LastError, s.FailedSince = existing.LastError, existing.FailedSince
+		if existing.Active {
+			s.NextRun, s.Attempts = existing.NextRun, existing.Attempts
+		}
 		if existing.Secret != s.Secret {
 			s.PreviousSecret, s.PreviousUntil = existing.Secret, now.Add(rotationOverlap)
 		} else if existing.PreviousUntil.After(now) {

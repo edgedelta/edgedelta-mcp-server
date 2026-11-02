@@ -14,6 +14,8 @@ const (
 	deliverBatch = 100
 	// suspendAfter is how long deliveries may keep failing before they stop until the client's next refresh.
 	suspendAfter = 24 * time.Hour
+	runInterval  = 30 * time.Second
+	maxBackoff   = 15 * time.Minute
 )
 
 // Outcome is what a delivery run did to a subscription.
@@ -32,7 +34,8 @@ type webhookBody struct {
 
 // Deliver posts the subscription's events since its cursor, oldest first, and moves its cursor past each one
 // the endpoint takes. It stops at the first failure worth retrying, which the next run tries again. The caller
-// saves s afterwards, or deletes it when the outcome has ended it. ctx carries no caller: the Handler's client
+// saves s afterwards, error or not, or deletes it when the outcome has ended it; s.NextRun says when to run
+// again. ctx carries no caller: the Handler's client
 // authenticates searches as the server itself.
 func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error) {
 	now := h.now()
@@ -40,6 +43,7 @@ func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error)
 		return Outcome{Ended: true}, nil
 	}
 	if !s.Active {
+		s.NextRun = s.RefreshBefore
 		return Outcome{}, nil
 	}
 	ctx = context.WithValue(ctx, tools.OrgIDKey, s.OrgID)
@@ -105,7 +109,11 @@ func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error)
 		}
 	}
 	if n == len(pg.items) {
-		s.LastError, s.FailedSince = "", time.Time{}
+		s.LastError, s.FailedSince, s.Attempts = "", time.Time{}, 0
+		s.NextRun = now.Add(runInterval)
+		if out.More {
+			s.NextRun = now
+		}
 	}
 	c, _ = pg.after(n)
 	if s.Cursor, err = c.encode(); err != nil {
@@ -119,6 +127,8 @@ func (h *Handler) failed(s *Subscription, reason string) {
 	if s.FailedSince.IsZero() {
 		s.FailedSince = h.now()
 	}
+	s.Attempts++
+	s.NextRun = h.now().Add(backoff(s.Attempts))
 	if h.now().Sub(s.FailedSince) > suspendAfter {
 		s.Active = false
 	}
@@ -129,7 +139,18 @@ func (h *Handler) searchFailed(ctx context.Context, s *Subscription, secrets []s
 	if e.Code == codeForbidden || e.Code == codeInvalidParams {
 		return h.terminate(ctx, s, secrets, e)
 	}
+	s.Attempts++
+	s.NextRun = h.now().Add(backoff(s.Attempts))
 	return Outcome{}, fmt.Errorf("searching events for %s: %s", s.ID, e.Message)
+}
+
+// backoff doubles from the run interval with each failed attempt, up to maxBackoff.
+func backoff(attempts int) time.Duration {
+	d := runInterval
+	for i := 1; i < attempts && d < maxBackoff; i++ {
+		d *= 2
+	}
+	return min(d, maxBackoff)
 }
 
 func (h *Handler) postGap(ctx context.Context, s *Subscription, secrets []string, c cursor) (bool, error) {

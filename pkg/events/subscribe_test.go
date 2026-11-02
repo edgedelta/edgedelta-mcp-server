@@ -188,7 +188,7 @@ func TestSubscribe(t *testing.T) {
 
 	now = t0.Add(10 * time.Minute)
 	p := subscribeParams(r.srv.URL)
-	p.TTLMs = json.RawMessage("172800000")
+	p.TTLMs = json.RawMessage("86400000")
 	p.Delivery.Secret = "whsec_" + base64.StdEncoding.EncodeToString([]byte("another secret, 24 bytes"))
 	second, e := h.Subscribe(ctx, p)
 	if e != nil {
