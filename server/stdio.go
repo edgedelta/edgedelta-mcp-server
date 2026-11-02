@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -17,6 +18,9 @@ import (
 type MCPServer struct {
 	server      *server.MCPServer
 	stdioServer *server.StdioServer
+	events      *events.Handler
+	orgID       string
+	apiToken    string
 	config      *serverConfig
 }
 
@@ -44,18 +48,21 @@ func NewStdioServer(orgID, apiToken string, opts ...ServerOption) (*MCPServer, e
 	AddCustomTools(s, httpClient)
 	AddCustomResources(s, httpClient)
 
-	stdioServer := server.NewStdioServer(s)
-	stdioServer.SetContextFunc(func(ctx context.Context) context.Context {
-		ctx = context.WithValue(ctx, tools.OrgIDKey, orgID)
-		ctx = context.WithValue(ctx, tools.EDTokenKey, apiToken)
-		return ctx
-	})
+	m := &MCPServer{
+		server:   s,
+		events:   config.eventsHandler(httpClient),
+		orgID:    orgID,
+		apiToken: apiToken,
+		config:   &config,
+	}
+	m.stdioServer = server.NewStdioServer(s)
+	m.stdioServer.SetContextFunc(m.withAuth)
+	return m, nil
+}
 
-	return &MCPServer{
-		server:      s,
-		stdioServer: stdioServer,
-		config:      &config,
-	}, nil
+func (m *MCPServer) withAuth(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, tools.OrgIDKey, m.orgID)
+	return context.WithValue(ctx, tools.EDTokenKey, m.apiToken)
 }
 
 // Run starts the MCP server and blocks until shutdown
@@ -63,9 +70,15 @@ func (m *MCPServer) Start(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	errC := make(chan error, 1)
+	errC := make(chan error, 2)
+	in, next := io.Pipe()
+	out := &lineWriter{w: os.Stdout}
 	go func() {
-		in, out := io.Reader(os.Stdin), io.Writer(os.Stdout)
+		if err := filterEvents(m.withAuth(ctx), m.events, os.Stdin, out, next); err != nil {
+			errC <- err
+		}
+	}()
+	go func() {
 		errC <- m.stdioServer.Listen(ctx, in, out)
 	}()
 
