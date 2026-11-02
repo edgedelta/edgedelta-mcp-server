@@ -70,8 +70,8 @@ The server offers Edge Delta's monitor events through the MCP Events extension,
 ([SEP-3415](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3415), not merged yet),
 so a client can start work when a monitor alerts, with no model or session in the loop.
 `initialize` advertises the extension, and the server answers `events/list` and `events/poll`
-over both HTTP and stdio. Events are polled; webhook delivery isn't offered yet, so
-`events/subscribe` and the other methods answer `-32601`.
+over both HTTP and stdio, and `events/subscribe` and `events/unsubscribe` where the host keeps
+webhook subscriptions (below). Other `events/*` methods answer `-32601`.
 
 | Event | Fires when | Arguments |
 |-------|------------|-----------|
@@ -102,6 +102,27 @@ when an `Mcp-Name` header doesn't name the request's event. The header isn't req
 
 To serve events over HTTP, mount `MCPHTTPServer.Handler()`: `HTTPServer()` is mcp-go's own
 server, which knows nothing of them.
+
+### Webhooks
+
+The server holds no state, so webhooks need a host that does: `server.WithEventSubscriptions(store,
+events.NewSender(false))` takes an `events.Store`, and each request's context carries the caller's
+principal (`events.WithPrincipal`), which must outlive token refreshes, such as a user or API token ID.
+Each type then lists `"webhook"` among its delivery modes. Edge Delta's hosted server does this.
+
+- **Subscribing.** A subscription is keyed by principal, callback URL, type and arguments, as the SEP has it.
+  The callback must be `https` on a public address and the secret `whsec_` with 24 to 64 bytes. A URL the
+  principal hasn't used in the last day is challenged first (`{"type":"verification"}`, echoed back), and
+  one that doesn't answer is `-32027` CallbackEndpointError. Grants last an hour at most, so a principal
+  whose access is revoked, and can't refresh, stops getting events within the hour. A refresh with a new
+  secret signs with both for ten minutes.
+- **Delivering.** The host runs `events.Handler.Deliver` for each subscription when its `NextRun` comes,
+  with a client that searches as the host. It posts the subscription's events in order, each signed per
+  Standard Webhooks with `X-MCP-Subscription-Id` and the cursor after it, from public addresses only and
+  following no redirects. The cursor moves only past what the endpoint takes. A failure is retried from
+  there with doubling backoff up to 15 minutes, and a day of failures suspends delivery until the next
+  refresh. A 413 skips its event, a 410 or a lapsed grant ends the subscription, a stretch the server had
+  to skip is a `gap` envelope, and a principal that may no longer search gets a `terminated` one.
 
 ## Prerequisites
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -154,9 +155,9 @@ func (r *receiver) types() []string {
 }
 
 func testSender(r *receiver) *Sender {
-	s := NewSender(true)
-	s.client.Transport.(*http.Transport).TLSClientConfig = r.srv.Client().Transport.(*http.Transport).TLSClientConfig
-	return s
+	pool := x509.NewCertPool()
+	pool.AddCert(r.srv.Certificate())
+	return NewSender(true, WithRootCAs(pool))
 }
 
 func principalContext(principal string) context.Context {

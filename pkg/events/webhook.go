@@ -99,9 +99,19 @@ type Sender struct {
 	now          func() time.Time
 }
 
+// SenderOption configures a Sender.
+type SenderOption func(*http.Transport)
+
+// WithRootCAs makes the Sender trust the pool's CAs instead of the system's, for private deployments and tests.
+func WithRootCAs(pool *x509.CertPool) SenderOption {
+	return func(t *http.Transport) {
+		t.TLSClientConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
+	}
+}
+
 // NewSender returns a Sender that refuses redirects and addresses that aren't globally routable, checked as
 // it dials so DNS rebinding can't get past it. allowPrivate turns that check off, for tests.
-func NewSender(allowPrivate bool) *Sender {
+func NewSender(allowPrivate bool, opts ...SenderOption) *Sender {
 	dialer := &net.Dialer{Timeout: deliveryTimeout}
 	if !allowPrivate {
 		dialer.Control = refusePrivate
@@ -111,6 +121,10 @@ func NewSender(allowPrivate bool) *Sender {
 		TLSHandshakeTimeout: deliveryTimeout,
 		MaxIdleConnsPerHost: 4,
 		IdleConnTimeout:     90 * time.Second,
+		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
+	}
+	for _, opt := range opts {
+		opt(transport)
 	}
 	return &Sender{
 		client: &http.Client{
