@@ -63,6 +63,46 @@ capture tools. Use `test_pipeline_ottl` for OTTL transforms (its `ExtractPattern
 also covers regex field extraction); use `test_pipeline_node` for non-OTTL node
 types such as log-to-metric and log-to-pattern.
 
+## Events
+
+The server offers Edge Delta's monitor events through the MCP Events extension,
+`io.modelcontextprotocol/events`
+([SEP-3415](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3415), not merged yet),
+so a client can start work when a monitor alerts, with no model or session in the loop.
+`initialize` advertises the extension, and the server answers `events/list` and `events/poll`
+over both HTTP and stdio. Events are polled; webhook delivery isn't offered yet, so
+`events/subscribe` and the other methods answer `-32601`.
+
+| Event | Fires when | Arguments |
+|-------|------------|-----------|
+| `monitor.alert` | a monitor changes state: `ALERT`, `WARN`, `RECOVERED` or `NO DATA` | `monitorId`, `monitor` (name), `type`, `states`, `service`, `query` (more CQL) |
+| `pattern.anomaly` | a pattern anomaly monitor changes state, with the patterns behind it | the same, without `type` |
+
+Each event's `eventId` is Edge Delta's `event.id`, and its `data` has the monitor's
+`title`, a `url` to the event in the app, `monitorName`, `state`, `priority`, `service`,
+`message` and more; `events/list` gives the full payload schema.
+
+Polling follows the SEP: a `null` cursor starts from now, `maxEvents` (default 50, at most
+100) batches with `hasMore`, `maxAgeMs` bounds replay (as does a seven-day ceiling), and
+`truncated` says when that skipped an event. Event search indexes events a little after they
+happen, so a cursor stays two minutes behind now and remembers what it delivered since; an
+event indexed late still arrives, once. Poll every 30 seconds (`nextPollMs`).
+
+```bash
+curl -s https://api.edgedelta.com/v1/orgs/$ED_ORG_ID/mcp \
+  -H "X-ED-API-Token: $ED_API_TOKEN" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' -H 'Mcp-Name: monitor.alert' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"events/poll","params":{"name":"monitor.alert","arguments":{"states":["ALERT"]},"cursor":null}}'
+```
+
+Errors use the SEP's provisional codes: `-32023` NotFound (`data.kind: "event"`) for an
+unknown type, `-32602` InvalidParams for arguments, cursors or CQL the search refuses,
+`-32024` Forbidden when the token can't search events, and `-32020` HeaderMismatch with HTTP 400
+when an `Mcp-Name` header doesn't name the request's event. The header isn't required yet.
+
+To serve events over HTTP, mount `MCPHTTPServer.Handler()`: `HTTPServer()` is mcp-go's own
+server, which knows nothing of them.
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.
