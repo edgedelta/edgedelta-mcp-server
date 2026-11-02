@@ -179,6 +179,9 @@ func (t EventType) query(args map[string]any) (string, error) {
 			}
 			clauses = append(clauses, fmt.Sprintf("event.type:%s", quote(s)))
 		case "query":
+			if !grouped(s) {
+				return "", fmt.Errorf("query must be one CQL expression, its parentheses and quotes balanced")
+			}
 			clauses = append(clauses, fmt.Sprintf("(%s)", s))
 		}
 	}
@@ -199,6 +202,31 @@ func stringList(v any) ([]string, error) {
 		out = append(out, s)
 	}
 	return out, nil
+}
+
+// grouped reports whether s can't close the parentheses it's wrapped in, reading escapes and quotes as CQL's
+// lexer does.
+func grouped(s string) bool {
+	depth, quoted, escaped := 0, false, false
+	for _, r := range s {
+		switch {
+		case escaped:
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case r == '"':
+			quoted = !quoted
+		case quoted:
+		case r == '(':
+			depth++
+		case r == ')':
+			depth--
+			if depth < 0 {
+				return false
+			}
+		}
+	}
+	return depth == 0 && !quoted && !escaped
 }
 
 func quote(s string) string {

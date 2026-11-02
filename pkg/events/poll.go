@@ -110,45 +110,104 @@ func (h *Handler) Poll(ctx context.Context, p PollParams) (*PollResult, *Error) 
 	if !ok {
 		return nil, invalidParams("cursor is not one this server issued")
 	}
-
-	floor := now - h.maxReplay.Milliseconds()
-	if p.MaxAgeMs != nil && *p.MaxAgeMs > 0 {
-		floor = max(floor, now-*p.MaxAgeMs)
-	}
-	if floor > c.Watermark {
-		skipped, e := h.anyUnseen(ctx, query, c, floor-1)
-		if e != nil {
-			return nil, e
-		}
-		result.Truncated = skipped
-		c = c.advance(floor)
-	}
-
-	limit := maxEvents + len(c.Seen) + 1
-	items, e := h.search(ctx, query, c.Watermark, now, limit)
+	c, truncated, e := h.rebase(ctx, query, c, p.MaxAgeMs)
 	if e != nil {
 		return nil, e
 	}
-	fresh := unseen(items, c)
-	batch := fresh[:min(len(fresh), maxEvents)]
-	result.HasMore = len(fresh) > maxEvents
-
-	for _, it := range batch {
+	pg, e := h.page(ctx, query, c, maxEvents)
+	if e != nil {
+		return nil, e
+	}
+	for _, it := range pg.items {
 		result.Events = append(result.Events, it.occurrence(t.Name, h.appURL))
+	}
+	result.Truncated = truncated || pg.skipped
+	result.HasMore = pg.more
+	next, _ := pg.after(len(pg.items))
+	return result.withCursor(next)
+}
+
+// page is a batch of events found from a cursor.
+type page struct {
+	start cursor
+	items []searchItem
+	more  bool
+	// next is the timestamp of the first event waiting past items, while more wait.
+	next int64
+	// settled is how far behind now the cursor may move: indexing is eventually consistent.
+	settled int64
+	// skipped is set when start had to move past events never delivered, to make room in a full Seen.
+	skipped bool
+}
+
+func (h *Handler) page(ctx context.Context, query string, c cursor, maxEvents int) (page, *Error) {
+	pg, e := h.fetch(ctx, query, c, maxEvents)
+	if e != nil || len(pg.items) > 0 || !pg.more {
+		return pg, e
+	}
+	// Seen is full of events at the next one's timestamp, so the cursor can't hold another there.
+	pg, e = h.fetch(ctx, query, c.advance(max(pg.next+1, c.room())), maxEvents)
+	pg.skipped = true
+	return pg, e
+}
+
+// fetch finds the events after a cursor, as many as the cursor can take without moving past one undelivered.
+func (h *Handler) fetch(ctx context.Context, query string, c cursor, maxEvents int) (page, *Error) {
+	now := h.now().UnixMilli()
+	items, e := h.search(ctx, query, c.Watermark, now, maxEvents+len(c.Seen)+1)
+	if e != nil {
+		return page{}, e
+	}
+	fresh := unseen(items, c)
+	pg := page{start: c, items: fresh[:min(len(fresh), maxEvents)], settled: now - h.lag.Milliseconds()}
+	if len(fresh) > len(pg.items) {
+		pg.more, pg.next = true, fresh[len(pg.items)].Timestamp
+	}
+	for n := 1; n <= len(pg.items); n++ {
+		if _, skips := pg.after(n); skips {
+			pg.more, pg.next, pg.items = true, pg.items[n-1].Timestamp, pg.items[:n-1]
+			break
+		}
+	}
+	return pg, nil
+}
+
+// after is the cursor once the page's first n events are delivered, and whether it moved past one still
+// waiting. While more wait, it stops at the last one delivered.
+func (p page) after(n int) (cursor, bool) {
+	c := p.start
+	c.Seen = slices.Clone(c.Seen)
+	for _, it := range p.items[:n] {
 		c.Seen = append(c.Seen, seenItem{T: it.Timestamp, ID: it.id()})
 	}
-
-	// Indexing is eventually consistent, so the watermark trails now by the lag, and
-	// stops at the last delivered event while more are waiting.
-	next := now - h.lag.Milliseconds()
-	if result.HasMore {
-		next = min(next, batch[len(batch)-1].Timestamp)
+	waiting := p.more || n < len(p.items)
+	next := p.settled
+	if waiting {
+		next = c.Watermark
+		if n > 0 {
+			next = min(p.settled, p.items[n-1].Timestamp)
+		}
 	}
 	c = c.advance(max(c.Watermark, next))
 	if len(c.Seen) > maxSeen {
 		c = c.advance(c.Seen[len(c.Seen)-maxSeen-1].T + 1)
 	}
-	return result.withCursor(c)
+	if !waiting {
+		return c, false
+	}
+	first := p.next
+	if n < len(p.items) {
+		first = p.items[n].Timestamp
+	}
+	return c, c.Watermark > first
+}
+
+// room is the lowest watermark that leaves Seen room for one more event.
+func (c cursor) room() int64 {
+	if len(c.Seen) < maxSeen {
+		return c.Watermark
+	}
+	return c.Seen[len(c.Seen)-maxSeen].T + 1
 }
 
 func (r *PollResult) withCursor(c cursor) (*PollResult, *Error) {
@@ -158,6 +217,24 @@ func (r *PollResult) withCursor(c cursor) (*PollResult, *Error) {
 	}
 	r.Cursor = s
 	return r, nil
+}
+
+// rebase moves a cursor up to the replay floor, now less maxAgeMs or the server's ceiling, and reports whether
+// that skipped an event.
+func (h *Handler) rebase(ctx context.Context, query string, c cursor, maxAgeMs *int64) (cursor, bool, *Error) {
+	now := h.now().UnixMilli()
+	floor := now - h.maxReplay.Milliseconds()
+	if maxAgeMs != nil && *maxAgeMs > 0 {
+		floor = max(floor, now-*maxAgeMs)
+	}
+	if floor <= c.Watermark {
+		return c, false, nil
+	}
+	skipped, e := h.anyUnseen(ctx, query, c, floor-1)
+	if e != nil {
+		return cursor{}, false, e
+	}
+	return c.advance(floor), skipped, nil
 }
 
 // advance moves the watermark to w and forgets what was delivered before it.
@@ -194,6 +271,15 @@ type searchResponse struct {
 
 // search finds the events in [from, to], both in milliseconds and inclusive, oldest first.
 func (h *Handler) search(ctx context.Context, query string, from, to int64, limit int) ([]searchItem, *Error) {
+	if to < from {
+		return nil, nil
+	}
+	// The API refuses from == to, so a single millisecond is searched with the next one, which is dropped.
+	items, e := h.searchRange(ctx, query, from, max(to, from+1), limit)
+	return slices.DeleteFunc(items, func(it searchItem) bool { return it.Timestamp > to }), e
+}
+
+func (h *Handler) searchRange(ctx context.Context, query string, from, to int64, limit int) ([]searchItem, *Error) {
 	keys, err := tools.FetchContextKeys(ctx)
 	if err != nil {
 		return nil, &Error{Code: codeForbidden, Message: "Forbidden", Data: map[string]any{"reason": "no organization"}}

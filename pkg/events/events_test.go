@@ -43,6 +43,9 @@ func (f *fakeSearch) Do(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !from.Before(to) {
+		return &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte("from can not be after or equal to")))}, nil
+	}
 	limit, err := strconv.Atoi(q.Get("limit"))
 	if err != nil {
 		return nil, err
@@ -154,6 +157,20 @@ func TestPollSequence(t *testing.T) {
 			},
 		},
 		{
+			desc: "polls again within the millisecond",
+			steps: []step{
+				{at: 0, want: []string{}},
+				{at: 0, want: []string{}},
+			},
+		},
+		{
+			desc: "maxAgeMs a millisecond past the cursor",
+			steps: []step{
+				{at: 0, want: []string{}},
+				{at: 10 * time.Minute, index: []searchItem{alert("edge", t0)}, maxAgeMs: ptr(int64(10*60_000 - 1)), want: []string{}, truncated: true},
+			},
+		},
+		{
 			desc: "maxAgeMs past the cursor with nothing skipped is not a gap",
 			steps: []step{
 				{at: 0, want: []string{}},
@@ -187,6 +204,51 @@ func TestPollSequence(t *testing.T) {
 			}
 			cur = &got.Cursor
 		}
+	}
+}
+
+func TestPollTieGroup(t *testing.T) {
+	search := &fakeSearch{}
+	now := t0
+	h := NewHandler(search, WithClock(func() time.Time { return now }))
+	started, e := h.Poll(orgContext(), PollParams{Name: monitorAlert})
+	if e != nil {
+		t.Fatalf("start: %+v", e)
+	}
+	for i := range 2 * maxSeen {
+		search.indexed = append(search.indexed, alert(fmt.Sprintf("tie%04d", i), t0.Add(time.Second)))
+	}
+	search.indexed = append(search.indexed, alert("after", t0.Add(2*time.Second)))
+	now = t0.Add(time.Minute)
+
+	cur, seen, truncated := started.Cursor, map[string]bool{}, 0
+	for i := 0; ; i++ {
+		got, e := h.Poll(orgContext(), PollParams{Name: monitorAlert, Cursor: &cur, MaxEvents: ptr(maxMaxEvents)})
+		if e != nil {
+			t.Fatalf("poll %d: %+v", i, e)
+		}
+		for _, id := range ids(got) {
+			if seen[id] {
+				t.Errorf("poll %d: %s delivered twice", i, id)
+			}
+			seen[id] = true
+		}
+		if got.Truncated {
+			truncated++
+		}
+		cur = got.Cursor
+		if !got.HasMore {
+			break
+		}
+	}
+	if got, want := len(seen), maxSeen+1; got != want {
+		t.Errorf("delivered got: %d, want: %d", got, want)
+	}
+	if !seen["after"] {
+		t.Errorf("after the tie group got: not delivered, want: delivered")
+	}
+	if truncated != 1 {
+		t.Errorf("truncated polls got: %d, want: 1", truncated)
 	}
 }
 
@@ -228,6 +290,7 @@ func TestPollErrors(t *testing.T) {
 		{desc: "unknown state", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"states": []any{"ON FIRE"}}}, want: codeInvalidParams},
 		{desc: "unknown monitor type", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"type": "vibes"}}, want: codeInvalidParams},
 		{desc: "type on pattern.anomaly", params: PollParams{Name: patternAnomaly, Arguments: map[string]any{"type": "log_threshold"}}, want: codeInvalidParams},
+		{desc: "query out of its group", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"query": "x) OR (event.domain:*"}}, want: codeInvalidParams},
 		{desc: "maxEvents of zero", params: PollParams{Name: monitorAlert, MaxEvents: ptr(0)}, want: codeInvalidParams},
 		{desc: "foreign cursor", params: PollParams{Name: monitorAlert, Cursor: ptr("abc")}, want: codeInvalidParams},
 		{desc: "search forbids", params: PollParams{Name: monitorAlert, Cursor: ptr(validCursor(t))}, status: http.StatusForbidden, want: codeForbidden},
@@ -298,6 +361,27 @@ func TestQuery(t *testing.T) {
 		}
 		if got != tc.want {
 			t.Errorf("%s: got: %v, want: %v", tc.desc, got, tc.want)
+		}
+	}
+}
+
+func TestGrouped(t *testing.T) {
+	tests := []struct {
+		query string
+		want  bool
+	}{
+		{query: `@ed.monitor.priority:"High"`, want: true},
+		{query: `(a OR b) AND c:"x) OR (y"`, want: true},
+		{query: `a\) AND b\(`, want: true},
+		{query: `x) OR (event.domain:*`, want: false},
+		{query: `x)`, want: false},
+		{query: `(x`, want: false},
+		{query: `c:"x`, want: false},
+		{query: `x\`, want: false},
+	}
+	for _, tc := range tests {
+		if got := grouped(tc.query); got != tc.want {
+			t.Errorf("%s: got: %v, want: %v", tc.query, got, tc.want)
 		}
 	}
 }
