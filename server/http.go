@@ -36,6 +36,7 @@ func WithDisableStreaming(disableStreaming bool) ServerOption {
 // MCPHTTPServer wraps the HTTP server and its dependencies
 type MCPHTTPServer struct {
 	httpServer *server.StreamableHTTPServer
+	handler    http.Handler
 	config     *serverConfig
 }
 
@@ -93,6 +94,7 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 
 	return &MCPHTTPServer{
 		httpServer: httpServer,
+		handler:    eventsHTTPHandler(config.eventsHandler(httpClient), authMiddleware, httpServer),
 		config:     &config,
 	}, nil
 }
@@ -101,7 +103,9 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 func (m *MCPHTTPServer) Start(_ context.Context) error {
 	addr := fmt.Sprintf(":%d", m.config.port)
 	m.config.logger.Info("Starting MCP server", "addr", addr)
-	return m.httpServer.Start(addr)
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", m.handler)
+	return (&http.Server{Addr: addr, Handler: mux}).ListenAndServe()
 }
 
 // Port returns the configured port
@@ -113,6 +117,12 @@ func addToContext(ctx context.Context, key tools.ContextKey, value string) conte
 	return context.WithValue(ctx, key, value)
 }
 
+// HTTPServer returns mcp-go's server, which answers no events/* requests; serve Handler instead.
 func (m *MCPHTTPServer) HTTPServer() *server.StreamableHTTPServer {
 	return m.httpServer
+}
+
+// Handler serves MCP over Streamable HTTP, the Events extension's requests included.
+func (m *MCPHTTPServer) Handler() http.Handler {
+	return m.handler
 }

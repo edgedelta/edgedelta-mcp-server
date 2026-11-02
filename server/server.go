@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -58,6 +59,7 @@ func newMCPServer(c serverConfig) *server.MCPServer {
 		server.WithTitle(c.serverTitle),
 		server.WithWebsiteURL(c.websiteURL),
 		server.WithIcons(c.icons...),
+		server.WithHooks(eventsHooks()),
 	)
 }
 
@@ -130,6 +132,7 @@ func AddCustomResources(s *server.MCPServer, client tools.Client) {
 // serverConfig holds internal configuration
 type serverConfig struct {
 	apiURL         string
+	appURL         string
 	serverName     string
 	serverVersion  string
 	serverTitle    string
@@ -152,6 +155,20 @@ func WithAPIURL(url string) ServerOption {
 	return func(c *serverConfig) {
 		c.apiURL = url
 	}
+}
+
+// WithAppURL sets the Edge Delta app's origin, which events link to. It follows the API URL by default.
+func WithAppURL(url string) ServerOption {
+	return func(c *serverConfig) {
+		c.appURL = url
+	}
+}
+
+func (c serverConfig) eventsHandler(client tools.Client) *events.Handler {
+	if c.appURL == "" {
+		return events.NewHandler(client)
+	}
+	return events.NewHandler(client, events.WithAppURL(c.appURL))
 }
 
 // WithServerName sets the server name
