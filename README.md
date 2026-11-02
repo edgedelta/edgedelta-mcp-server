@@ -108,21 +108,25 @@ server, which knows nothing of them.
 The server holds no state, so webhooks need a host that does: `server.WithEventSubscriptions(store,
 events.NewSender(false))` takes an `events.Store`, and each request's context carries the caller's
 principal (`events.WithPrincipal`), which must outlive token refreshes, such as a user or API token ID.
-Each type then lists `"webhook"` among its delivery modes. Edge Delta's hosted server does this.
+The store's `Put` and `Delete` must apply only while a subscription is at the `Version` they read, and return
+`events.ErrConflict` otherwise, since delivery runs and subscribe calls race across replicas. Each type then lists `"webhook"` among its delivery modes. Edge Delta's hosted server does this.
 
-- **Subscribing.** A subscription is keyed by principal, callback URL, type and arguments, as the SEP has it.
+- **Subscribing.** A subscription is keyed by organization, principal, callback URL, type and arguments.
   The callback must be `https` on a public address and the secret `whsec_` with 24 to 64 bytes. A URL the
-  principal hasn't used in the last day is challenged first (`{"type":"verification"}`, echoed back), and
+  principal hasn't used in the organization in the last day is challenged first (`{"type":"verification"}`, echoed back), and
   one that doesn't answer is `-32027` CallbackEndpointError. Grants last an hour at most, so a principal
   whose access is revoked, and can't refresh, stops getting events within the hour. A refresh with a new
   secret signs with both for ten minutes.
 - **Delivering.** The host runs `events.Handler.Deliver` for each subscription when its `NextRun` comes,
   with a client that searches as the host. It posts the subscription's events in order, each signed per
   Standard Webhooks with `X-MCP-Subscription-Id` and the cursor after it, from public addresses only and
-  following no redirects. The cursor moves only past what the endpoint takes. A failure is retried from
-  there with doubling backoff up to 15 minutes, and a day of failures suspends delivery until the next
-  refresh. A 413 skips its event, a 410 or a lapsed grant ends the subscription, a stretch the server had
-  to skip is a `gap` envelope, and a principal that may no longer search gets a `terminated` one.
+  following no redirects. An event keeps its `webhook-id` across retries, for receivers to dedupe. The
+  cursor moves only past what the endpoint takes. A failure is retried from there with doubling backoff up
+  to 15 minutes, and a day of failures suspends delivery until the next refresh. A failed search is retried
+  the same way. A 413 skips its event, a 410 or a lapsed grant ends the subscription, and a stretch the
+  server had to skip is a `gap` envelope, retried like an event. With a deadline on its context, `Deliver`
+  stops while a post still has time to finish. A save that returns `ErrConflict` should be dropped: the
+  events go again next run.
 
 ## Prerequisites
 

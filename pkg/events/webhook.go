@@ -68,15 +68,12 @@ func sign(secrets []string, id string, at time.Time, body []byte) (string, error
 	return strings.Join(sigs, " "), nil
 }
 
-func messageID(kind string) (string, error) {
+func randomHex() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	if kind == "" {
-		return "msg_" + hex.EncodeToString(b), nil
-	}
-	return "msg_" + kind + "_" + hex.EncodeToString(b), nil
+	return hex.EncodeToString(b), nil
 }
 
 // Delivery is one webhook POST's outcome.
@@ -197,14 +194,11 @@ func (s *Sender) check(raw string) error {
 	return nil
 }
 
-// Post signs body with each secret, the current one first, and posts it to the subscription's URL.
-func (s *Sender) Post(ctx context.Context, subscriptionID, target string, secrets []string, kind string, body []byte) (Delivery, error) {
+// Post signs body with each secret, the current one first, and posts it to the subscription's URL. id is the
+// webhook-id, which must stay the same when the message is tried again, for receivers to dedupe.
+func (s *Sender) Post(ctx context.Context, subscriptionID, id, target string, secrets []string, body []byte) (Delivery, error) {
 	if len(body) > maxBodyBytes {
 		return Delivery{Status: http.StatusRequestEntityTooLarge, Reason: reason4xx}, nil
-	}
-	id, err := messageID(kind)
-	if err != nil {
-		return Delivery{}, err
 	}
 	at := s.now()
 	signature, err := sign(secrets, id, at, body)
@@ -260,16 +254,15 @@ func failureReason(err error) string {
 
 // challenge asks the endpoint to echo a nonce, proving it wants the subscription's deliveries.
 func (s *Sender) challenge(ctx context.Context, subscriptionID, target, secret string) (string, bool, error) {
-	nonce, err := messageID("")
+	nonce, err := randomHex()
 	if err != nil {
 		return "", false, err
 	}
-	nonce = strings.TrimPrefix(nonce, "msg_")
 	body, err := json.Marshal(map[string]string{"type": "verification", "challenge": nonce})
 	if err != nil {
 		return "", false, err
 	}
-	d, err := s.Post(ctx, subscriptionID, target, []string{secret}, "verification", body)
+	d, err := s.Post(ctx, subscriptionID, "msg_verification_"+nonce, target, []string{secret}, body)
 	if err != nil {
 		return "", false, err
 	}

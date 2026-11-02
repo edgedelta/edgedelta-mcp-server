@@ -169,7 +169,7 @@ func (noStore) Get(context.Context, string) (*events.Subscription, bool, error) 
 	return nil, false, nil
 }
 func (noStore) Put(context.Context, *events.Subscription) error          { return nil }
-func (noStore) Delete(context.Context, string) error                     { return nil }
+func (noStore) Delete(context.Context, string, int64) error              { return nil }
 func (noStore) VerifiedUntil(context.Context, string) (time.Time, error) { return time.Time{}, nil }
 func (noStore) Verify(context.Context, string, time.Time) error          { return nil }
 

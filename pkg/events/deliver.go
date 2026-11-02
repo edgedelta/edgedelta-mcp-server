@@ -33,10 +33,11 @@ type webhookBody struct {
 }
 
 // Deliver posts the subscription's events since its cursor, oldest first, and moves its cursor past each one
-// the endpoint takes. It stops at the first failure worth retrying, which the next run tries again. The caller
-// saves s afterwards, error or not, or deletes it when the outcome has ended it; s.NextRun says when to run
-// again. ctx carries no caller: the Handler's client
-// authenticates searches as the server itself.
+// the endpoint takes. It stops at the first failure worth retrying, which the next run tries again, and before
+// ctx's deadline while a post still has time to finish. The caller saves s afterwards with Put, error or not, or
+// deletes it when the outcome has ended it; s.NextRun says when to run again. ErrConflict there means a client
+// changed s meanwhile: drop the run, and its events go again under the same webhook-ids. ctx carries no caller:
+// the Handler's client authenticates searches as the server itself.
 func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error) {
 	now := h.now()
 	if !s.RefreshBefore.After(now) {
@@ -58,7 +59,7 @@ func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error)
 	}
 	query, err := t.query(s.Arguments)
 	if err != nil {
-		return h.terminate(ctx, s, secrets, &Error{Code: codeUnsupported, Message: "Unsupported", Data: map[string]any{"feature": "inputSchema", "reason": "schema_changed"}})
+		return h.terminate(ctx, s, secrets, &Error{Code: codeUnsupported, Message: "the event type no longer takes these arguments"})
 	}
 	c, ok := decodeCursor(s.Cursor)
 	if !ok {
@@ -67,32 +68,44 @@ func (h *Handler) Deliver(ctx context.Context, s *Subscription) (Outcome, error)
 
 	c, truncated, e := h.rebase(ctx, query, c, nil)
 	if e != nil {
-		return h.searchFailed(ctx, s, secrets, e)
-	}
-	if truncated {
-		ended, err := h.postGap(ctx, s, secrets, c)
-		if err != nil || ended {
-			return Outcome{Ended: ended}, err
-		}
+		return h.searchFailed(s, e)
 	}
 	pg, e := h.page(ctx, query, c, deliverBatch)
 	if e != nil {
-		return h.searchFailed(ctx, s, secrets, e)
+		return h.searchFailed(s, e)
+	}
+	if truncated || pg.skipped {
+		d, err := h.postGap(ctx, s, secrets, pg.start)
+		if err != nil {
+			return Outcome{}, err
+		}
+		if d.Status == http.StatusGone {
+			return Outcome{Ended: true}, nil
+		}
+		if d.Retryable() {
+			h.failed(s, d.Reason)
+			return Outcome{}, nil
+		}
 	}
 
 	out := Outcome{More: pg.more}
 	n := 0
 	for ; n < len(pg.items); n++ {
+		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < deliveryTimeout {
+			s.NextRun, out.More = now, true
+			break
+		}
 		c, _ := pg.after(n + 1)
 		next, err := c.encode()
 		if err != nil {
 			return out, err
 		}
-		body, err := json.Marshal(webhookBody{Occurrence: pg.items[n].occurrence(s.Name, h.appURL), Cursor: next})
+		it := pg.items[n]
+		body, err := json.Marshal(webhookBody{Occurrence: it.occurrence(s.Name, h.appURL), Cursor: next})
 		if err != nil {
 			return out, err
 		}
-		d, err := h.sender.Post(ctx, s.ID, s.URL, secrets, "", body)
+		d, err := h.sender.Post(ctx, s.ID, "msg_"+s.ID+"_"+it.id(), s.URL, secrets, body)
 		if err != nil {
 			return out, err
 		}
@@ -134,11 +147,8 @@ func (h *Handler) failed(s *Subscription, reason string) {
 	}
 }
 
-// searchFailed ends the subscription when its principal may no longer search, and otherwise waits to retry.
-func (h *Handler) searchFailed(ctx context.Context, s *Subscription, secrets []string, e *Error) (Outcome, error) {
-	if e.Code == codeForbidden || e.Code == codeInvalidParams {
-		return h.terminate(ctx, s, secrets, e)
-	}
+// searchFailed waits to retry. Searches run as the server, so even a refusal says nothing about the principal.
+func (h *Handler) searchFailed(s *Subscription, e *Error) (Outcome, error) {
 	s.Attempts++
 	s.NextRun = h.now().Add(backoff(s.Attempts))
 	return Outcome{}, fmt.Errorf("searching events for %s: %s", s.ID, e.Message)
@@ -153,33 +163,38 @@ func backoff(attempts int) time.Duration {
 	return min(d, maxBackoff)
 }
 
-func (h *Handler) postGap(ctx context.Context, s *Subscription, secrets []string, c cursor) (bool, error) {
+// postGap tells the endpoint that events before c were never delivered, and moves s's cursor to c once it has.
+func (h *Handler) postGap(ctx context.Context, s *Subscription, secrets []string, c cursor) (Delivery, error) {
 	next, err := c.encode()
 	if err != nil {
-		return false, err
+		return Delivery{}, err
 	}
 	body, err := json.Marshal(map[string]string{"type": "gap", "cursor": next})
 	if err != nil {
-		return false, err
+		return Delivery{}, err
 	}
-	d, err := h.sender.Post(ctx, s.ID, s.URL, secrets, "gap", body)
+	id, err := digest(next)
 	if err != nil {
-		return false, err
+		return Delivery{}, err
 	}
-	if d.Status == http.StatusGone {
-		return true, nil
+	d, err := h.sender.Post(ctx, s.ID, "msg_"+s.ID+"_gap_"+id, s.URL, secrets, body)
+	if err != nil {
+		return Delivery{}, err
 	}
-	s.Cursor = next
-	return false, nil
+	if d.Reason == "" {
+		s.Cursor = next
+	}
+	return d, nil
 }
 
-// terminate tells the endpoint the subscription is over, as well as it can, and ends it.
+// terminate tells the endpoint the subscription is over, as well as it can, and ends it. The error goes to a
+// third party, so it carries only its code and message.
 func (h *Handler) terminate(ctx context.Context, s *Subscription, secrets []string, e *Error) (Outcome, error) {
-	body, err := json.Marshal(map[string]any{"type": "terminated", "error": e})
+	body, err := json.Marshal(map[string]any{"type": "terminated", "error": map[string]any{"code": e.Code, "message": e.Message}})
 	if err != nil {
 		return Outcome{}, err
 	}
-	if _, err := h.sender.Post(ctx, s.ID, s.URL, secrets, "terminated", body); err != nil {
+	if _, err := h.sender.Post(ctx, s.ID, "msg_"+s.ID+"_terminated", s.URL, secrets, body); err != nil {
 		return Outcome{}, err
 	}
 	return Outcome{Ended: true}, nil

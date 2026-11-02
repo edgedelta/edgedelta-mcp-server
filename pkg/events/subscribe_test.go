@@ -45,16 +45,45 @@ func (m *memStore) Get(_ context.Context, id string) (*Subscription, bool, error
 func (m *memStore) Put(_ context.Context, s *Subscription) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if cur, ok := m.subs[s.ID]; (ok && cur.Version != s.Version) || (!ok && s.Version != 0) {
+		return ErrConflict
+	}
+	s.Version++
 	c := *s
 	m.subs[s.ID] = &c
 	return nil
 }
 
-func (m *memStore) Delete(_ context.Context, id string) error {
+func (m *memStore) Delete(_ context.Context, id string, version int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if cur, ok := m.subs[id]; !ok || cur.Version != version {
+		return ErrConflict
+	}
 	delete(m.subs, id)
 	return nil
+}
+
+// racingStore lets another replica's write land just before each of the first puts.
+type racingStore struct {
+	*memStore
+	races int
+}
+
+func (r *racingStore) Put(ctx context.Context, s *Subscription) error {
+	if r.races > 0 {
+		r.races--
+		cur, found, err := r.Get(ctx, s.ID)
+		if err != nil {
+			return err
+		}
+		if found {
+			if err := r.memStore.Put(ctx, cur); err != nil {
+				return err
+			}
+		}
+	}
+	return r.memStore.Put(ctx, s)
 }
 
 func (m *memStore) VerifiedUntil(_ context.Context, key string) (time.Time, error) {
@@ -109,6 +138,7 @@ func (r *receiver) serve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	msg["subscription"] = req.Header.Get("X-MCP-Subscription-Id")
+	msg["webhookId"] = req.Header.Get("webhook-id")
 	r.received = append(r.received, msg)
 	if msg["type"] == "verification" {
 		if r.echo {
@@ -161,8 +191,17 @@ func testSender(r *receiver) *Sender {
 }
 
 func principalContext(principal string) context.Context {
-	ctx := context.WithValue(context.Background(), tools.OrgIDKey, "org1")
-	return WithPrincipal(ctx, principal)
+	return orgPrincipalContext("org1", principal)
+}
+
+func orgPrincipalContext(orgID, principal string) context.Context {
+	return WithPrincipal(context.WithValue(context.Background(), tools.OrgIDKey, orgID), principal)
+}
+
+func unsubscribeParams(url string) UnsubscribeParams {
+	p := UnsubscribeParams{Name: monitorAlert}
+	p.Delivery.URL = url
+	return p
 }
 
 func subscribeParams(url string) SubscribeParams {
@@ -223,13 +262,97 @@ func TestSubscribe(t *testing.T) {
 		t.Errorf("challenges mismatch, one per principal and url (-want, +got): %v", diff)
 	}
 
-	if _, e := h.Unsubscribe(ctx, UnsubscribeParams{Name: monitorAlert, Delivery: struct {
-		URL string `json:"url"`
-	}{URL: r.srv.URL}}); e != nil {
+	if _, e := h.Unsubscribe(ctx, unsubscribeParams(r.srv.URL)); e != nil {
 		t.Fatalf("unsubscribe: %+v", e)
 	}
 	if _, found, err := store.Get(ctx, first.ID); err != nil || found {
 		t.Errorf("after unsubscribe got: found %v, err %v, want gone", found, err)
+	}
+}
+
+func TestSubscribeScopesByOrg(t *testing.T) {
+	r := newReceiver(t)
+	store := newMemStore()
+	h := NewHandler(&fakeSearch{}, WithClock(func() time.Time { return t0 }), WithStore(store, testSender(r)))
+	a, e := h.Subscribe(orgPrincipalContext("orgA", "user1"), subscribeParams(r.srv.URL))
+	if e != nil {
+		t.Fatalf("subscribe in orgA: %+v", e)
+	}
+	if _, e := h.Unsubscribe(orgPrincipalContext("orgB", "user1"), unsubscribeParams(r.srv.URL)); e == nil || e.Code != codeNotFound {
+		t.Errorf("unsubscribe in orgB got: %+v, want: NotFound", e)
+	}
+	b, e := h.Subscribe(orgPrincipalContext("orgB", "user1"), subscribeParams(r.srv.URL))
+	if e != nil {
+		t.Fatalf("subscribe in orgB: %+v", e)
+	}
+	if a.ID == b.ID {
+		t.Errorf("orgB got orgA's subscription %s", a.ID)
+	}
+	s, found, err := store.Get(context.Background(), a.ID)
+	if err != nil || !found || s.OrgID != "orgA" {
+		t.Errorf("orgA's subscription got: %+v, found %v, err %v, want it kept in orgA", s, found, err)
+	}
+	if diff := cmp.Diff([]string{"verification", "verification"}, r.types()); diff != "" {
+		t.Errorf("challenges mismatch, one per org (-want, +got): %v", diff)
+	}
+}
+
+func TestSubscribeResumesSuspended(t *testing.T) {
+	r := newReceiver(t)
+	store := newMemStore()
+	now := t0
+	h := NewHandler(&fakeSearch{}, WithClock(func() time.Time { return now }), WithStore(store, testSender(r)))
+	sub, e := h.Subscribe(principalContext("user1"), subscribeParams(r.srv.URL))
+	if e != nil {
+		t.Fatalf("subscribe: %+v", e)
+	}
+	s, _, err := store.Get(context.Background(), sub.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	s.Active, s.LastError, s.FailedSince, s.Attempts = false, reason5xx, t0.Add(-25*time.Hour), 40
+	if err := store.Put(context.Background(), s); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	now = t0.Add(30 * time.Minute)
+	got, e := h.Subscribe(principalContext("user1"), subscribeParams(r.srv.URL))
+	if e != nil {
+		t.Fatalf("refresh: %+v", e)
+	}
+	if got.DeliveryStatus == nil || got.DeliveryStatus.Active {
+		t.Errorf("deliveryStatus got: %+v, want the suspension it found", got.DeliveryStatus)
+	}
+	s, _, err = store.Get(context.Background(), sub.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !s.Active || s.LastError != "" || !s.FailedSince.IsZero() || s.Attempts != 0 || !s.NextRun.Equal(now) {
+		t.Errorf("resumed got: active %v, lastError %q, failedSince %v, attempts %d, nextRun %v, want a clean slate due now", s.Active, s.LastError, s.FailedSince, s.Attempts, s.NextRun)
+	}
+}
+
+func TestSubscribeRetriesConflicts(t *testing.T) {
+	tests := []struct {
+		desc  string
+		races int
+		fails bool
+	}{
+		{desc: "a race", races: 1},
+		{desc: "races every time", races: saveAttempts + 1, fails: true},
+	}
+	for _, tc := range tests {
+		r := newReceiver(t)
+		store := &racingStore{memStore: newMemStore()}
+		h := NewHandler(&fakeSearch{}, WithClock(func() time.Time { return t0 }), WithStore(store, testSender(r)))
+		if _, e := h.Subscribe(principalContext("user1"), subscribeParams(r.srv.URL)); e != nil {
+			t.Fatalf("%s: subscribe: %+v", tc.desc, e)
+		}
+		store.races = tc.races
+		_, e := h.Subscribe(principalContext("user1"), subscribeParams(r.srv.URL))
+		if (e != nil) != tc.fails {
+			t.Errorf("%s: refresh got: %+v, want failure: %v", tc.desc, e, tc.fails)
+		}
 	}
 }
 
@@ -315,7 +438,7 @@ func TestDialRefusesPrivate(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer srv.Close()
 	s := NewSender(false)
-	got, err := s.Post(context.Background(), "sub_1", srv.URL, []string{testSecret}, "", []byte(`{}`))
+	got, err := s.Post(context.Background(), "sub_1", "msg_1", srv.URL, []string{testSecret}, []byte(`{}`))
 	if err != nil {
 		t.Fatalf("post: %v", err)
 	}

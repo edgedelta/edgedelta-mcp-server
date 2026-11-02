@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,6 +21,7 @@ const (
 	maxTTL          = time.Hour
 	verifiedFor     = 24 * time.Hour
 	rotationOverlap = 10 * time.Minute
+	saveAttempts    = 3
 )
 
 type principalKey struct{}
@@ -60,13 +62,21 @@ type Subscription struct {
 	// NextRun is when Deliver should next run for it, and Attempts how many runs in a row failed.
 	NextRun  time.Time `json:"nextRun"`
 	Attempts int       `json:"attempts,omitempty"`
+	// Version is the Store's, 0 until the subscription is first saved.
+	Version int64 `json:"-"`
 }
 
-// Store keeps webhook subscriptions, since the server holds no state of its own.
+// ErrConflict is what a Store returns when a subscription changed since it was read.
+var ErrConflict = errors.New("the subscription changed since it was read")
+
+// Store keeps webhook subscriptions, since the server holds no state of its own. Delivery runs and subscribe
+// calls race across replicas, so Put and Delete apply only while the stored subscription is still at the
+// version read, absent for 0, and return ErrConflict otherwise.
 type Store interface {
 	Get(ctx context.Context, id string) (*Subscription, bool, error)
+	// Put saves s and moves s.Version on.
 	Put(ctx context.Context, s *Subscription) error
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, id string, version int64) error
 	// VerifiedUntil and Verify keep when a principal's callback URL passed the challenge, by verificationKey.
 	VerifiedUntil(ctx context.Context, key string) (time.Time, error)
 	Verify(ctx context.Context, key string, until time.Time) error
@@ -98,16 +108,16 @@ func digest(parts ...any) (string, error) {
 	return hex.EncodeToString(sum[:8]), nil
 }
 
-func subscriptionID(principal, url, name string, args map[string]any) (string, error) {
-	d, err := digest(principal, url, name, args)
+func subscriptionID(orgID, principal, url, name string, args map[string]any) (string, error) {
+	d, err := digest(orgID, principal, url, name, args)
 	if err != nil {
 		return "", err
 	}
 	return "sub_" + d, nil
 }
 
-func verificationKey(principal, url string) (string, error) {
-	return digest(principal, url)
+func verificationKey(orgID, principal, url string) (string, error) {
+	return digest(orgID, principal, url)
 }
 
 type deliveryParams struct {
@@ -201,32 +211,45 @@ func (h *Handler) Subscribe(ctx context.Context, p SubscribeParams) (*SubscribeR
 	if e != nil {
 		return nil, e
 	}
-	id, err := subscriptionID(principal, p.Delivery.URL, p.Name, p.Arguments)
+	id, err := subscriptionID(orgID, principal, p.Delivery.URL, p.Name, p.Arguments)
 	if err != nil {
 		return nil, internal(err.Error())
 	}
-
-	existing, found, err := h.store.Get(ctx, id)
-	if err != nil {
-		return nil, internal(fmt.Sprintf("reading the subscription: %v", err))
-	}
-	if e := h.verify(ctx, id, principal, p.Delivery.URL, p.Delivery.Secret); e != nil {
+	if e := h.verify(ctx, id, orgID, principal, p.Delivery.URL, p.Delivery.Secret); e != nil {
 		return nil, e
 	}
-
-	now := h.now()
-	s := &Subscription{
+	s := Subscription{
 		ID: id, OrgID: orgID, Principal: principal, URL: p.Delivery.URL, Name: p.Name, Arguments: p.Arguments,
-		Secret: p.Delivery.Secret, RefreshBefore: now.Add(ttl), Active: true, NextRun: now,
+		Secret: p.Delivery.Secret, Active: true,
 	}
-	result := &SubscribeResult{ResultType: "complete", ID: id, RefreshBefore: s.RefreshBefore.UTC().Format(time.RFC3339Nano)}
-	live := found && existing.RefreshBefore.After(now)
+	for range saveAttempts {
+		result, conflict, e := h.save(ctx, s, query, ttl, p)
+		if !conflict {
+			return result, e
+		}
+	}
+	return nil, internal("the subscription kept changing while it was saved")
+}
+
+// save creates or refreshes s from what's stored, and reports a conflict for the caller to read it again.
+func (h *Handler) save(ctx context.Context, s Subscription, query string, ttl time.Duration, p SubscribeParams) (*SubscribeResult, bool, *Error) {
+	existing, found, err := h.store.Get(ctx, s.ID)
+	if err != nil {
+		return nil, false, internal(fmt.Sprintf("reading the subscription: %v", err))
+	}
+	now := h.now()
+	s.RefreshBefore, s.NextRun = now.Add(ttl), now
+	result := &SubscribeResult{ResultType: "complete", ID: s.ID, RefreshBefore: s.RefreshBefore.UTC().Format(time.RFC3339Nano)}
+	if found {
+		s.Version = existing.Version
+	}
+	var e *Error
 	switch {
-	case live:
+	case found && existing.RefreshBefore.After(now):
 		s.Cursor = existing.Cursor
-		s.LastError, s.FailedSince = existing.LastError, existing.FailedSince
+		// A suspended subscription resumes with a clean slate, or its old failures would suspend it again.
 		if existing.Active {
-			s.NextRun, s.Attempts = existing.NextRun, existing.Attempts
+			s.LastError, s.FailedSince, s.NextRun, s.Attempts = existing.LastError, existing.FailedSince, existing.NextRun, existing.Attempts
 		}
 		if existing.Secret != s.Secret {
 			s.PreviousSecret, s.PreviousUntil = existing.Secret, now.Add(rotationOverlap)
@@ -237,25 +260,27 @@ func (h *Handler) Subscribe(ctx context.Context, p SubscribeParams) (*SubscribeR
 	case p.Cursor != nil:
 		c, ok := decodeCursor(*p.Cursor)
 		if !ok {
-			return nil, invalidParams("cursor is not one this server issued")
+			return nil, false, invalidParams("cursor is not one this server issued")
 		}
 		c, result.Truncated, e = h.rebase(ctx, query, c, p.MaxAgeMs)
 		if e != nil {
-			return nil, e
+			return nil, false, e
 		}
 		if s.Cursor, err = c.encode(); err != nil {
-			return nil, internal(err.Error())
+			return nil, false, internal(err.Error())
 		}
 	default:
 		if s.Cursor, err = (cursor{Watermark: now.UnixMilli()}).encode(); err != nil {
-			return nil, internal(err.Error())
+			return nil, false, internal(err.Error())
 		}
 	}
-	if err := h.store.Put(ctx, s); err != nil {
-		return nil, internal(fmt.Sprintf("saving the subscription: %v", err))
+	if err := h.store.Put(ctx, &s); errors.Is(err, ErrConflict) {
+		return nil, true, nil
+	} else if err != nil {
+		return nil, false, internal(fmt.Sprintf("saving the subscription: %v", err))
 	}
 	result.Cursor = s.Cursor
-	return result, nil
+	return result, false, nil
 }
 
 func (s *Subscription) status() *DeliveryStatus {
@@ -271,8 +296,8 @@ func (s *Subscription) status() *DeliveryStatus {
 }
 
 // verify makes sure the principal's callback URL wants deliveries, by challenge unless it did recently.
-func (h *Handler) verify(ctx context.Context, id, principal, url, secret string) *Error {
-	key, err := verificationKey(principal, url)
+func (h *Handler) verify(ctx context.Context, id, orgID, principal, url, secret string) *Error {
+	key, err := verificationKey(orgID, principal, url)
 	if err != nil {
 		return internal(err.Error())
 	}
@@ -307,26 +332,33 @@ type UnsubscribeParams struct {
 
 // Unsubscribe answers events/unsubscribe.
 func (h *Handler) Unsubscribe(ctx context.Context, p UnsubscribeParams) (map[string]any, *Error) {
-	_, principal, e := h.subscriber(ctx)
+	orgID, principal, e := h.subscriber(ctx)
 	if e != nil {
 		return nil, e
 	}
 	if p.Arguments == nil {
 		p.Arguments = map[string]any{}
 	}
-	id, err := subscriptionID(principal, p.Delivery.URL, p.Name, p.Arguments)
+	id, err := subscriptionID(orgID, principal, p.Delivery.URL, p.Name, p.Arguments)
 	if err != nil {
 		return nil, internal(err.Error())
 	}
-	_, found, err := h.store.Get(ctx, id)
-	if err != nil {
-		return nil, internal(fmt.Sprintf("reading the subscription: %v", err))
+	for range saveAttempts {
+		existing, found, err := h.store.Get(ctx, id)
+		if err != nil {
+			return nil, internal(fmt.Sprintf("reading the subscription: %v", err))
+		}
+		if !found {
+			return nil, &Error{Code: codeNotFound, Message: "no such subscription", Data: map[string]any{"kind": "subscription"}}
+		}
+		err = h.store.Delete(ctx, id, existing.Version)
+		if errors.Is(err, ErrConflict) {
+			continue
+		}
+		if err != nil {
+			return nil, internal(fmt.Sprintf("deleting the subscription: %v", err))
+		}
+		return map[string]any{"resultType": "complete"}, nil
 	}
-	if !found {
-		return nil, &Error{Code: codeNotFound, Message: "no such subscription", Data: map[string]any{"kind": "subscription"}}
-	}
-	if err := h.store.Delete(ctx, id); err != nil {
-		return nil, internal(fmt.Sprintf("deleting the subscription: %v", err))
-	}
-	return map[string]any{"resultType": "complete"}, nil
+	return nil, internal("the subscription kept changing while it was deleted")
 }
