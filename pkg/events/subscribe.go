@@ -30,7 +30,8 @@ func WithPrincipal(ctx context.Context, principal string) context.Context {
 	return context.WithValue(ctx, principalKey{}, principal)
 }
 
-func principalOf(ctx context.Context) string {
+// Principal returns who WithPrincipal named, or "".
+func Principal(ctx context.Context) string {
 	p, ok := ctx.Value(principalKey{}).(string)
 	if !ok {
 		return ""
@@ -162,7 +163,7 @@ func (h *Handler) subscriber(ctx context.Context) (string, string, *Error) {
 		return "", "", &Error{Code: codeMethodNotFound, Message: "webhook delivery is not offered here"}
 	}
 	keys, err := tools.FetchContextKeys(ctx)
-	principal := principalOf(ctx)
+	principal := Principal(ctx)
 	if err != nil || principal == "" {
 		return "", "", &Error{Code: codeForbidden, Message: "Forbidden", Data: map[string]any{"reason": "webhooks need an authenticated principal"}}
 	}
