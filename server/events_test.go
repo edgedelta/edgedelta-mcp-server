@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
@@ -159,5 +160,34 @@ func TestFilterEvents(t *testing.T) {
 	}
 	if diff := cmp.Diff(map[float64]any{2: true, 3: false}, answered); diff != "" {
 		t.Errorf("answered mismatch (-want, +got): %v", diff)
+	}
+}
+
+type noStore struct{}
+
+func (noStore) Get(context.Context, string) (*events.Subscription, bool, error) {
+	return nil, false, nil
+}
+func (noStore) Put(context.Context, *events.Subscription) error          { return nil }
+func (noStore) Delete(context.Context, string, int64) error              { return nil }
+func (noStore) VerifiedUntil(context.Context, string) (time.Time, error) { return time.Time{}, nil }
+func (noStore) Verify(context.Context, string, time.Time) error          { return nil }
+
+func TestHTTPEventsWithSubscriptions(t *testing.T) {
+	m, err := NewHTTPServer(WithEventSubscriptions(noStore{}, events.NewSender(false)))
+	if err != nil {
+		t.Fatalf("NewHTTPServer: %v", err)
+	}
+	srv := httptest.NewServer(m.Handler())
+	defer srv.Close()
+
+	_, got := post(t, srv.URL, `{"jsonrpc":"2.0","id":1,"method":"events/list"}`, nil)
+	var delivery []any
+	for _, e := range dig(got, "result", "events").([]any) {
+		delivery = append(delivery, e.(map[string]any)["delivery"])
+	}
+	want := []any{[]any{"poll", "webhook"}, []any{"poll", "webhook"}}
+	if diff := cmp.Diff(want, delivery); diff != "" {
+		t.Errorf("delivery mismatch (-want, +got): %v", diff)
 	}
 }

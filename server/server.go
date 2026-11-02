@@ -133,6 +133,8 @@ func AddCustomResources(s *server.MCPServer, client tools.Client) {
 type serverConfig struct {
 	apiURL         string
 	appURL         string
+	eventStore     events.Store
+	eventSender    *events.Sender
 	serverName     string
 	serverVersion  string
 	serverTitle    string
@@ -164,11 +166,25 @@ func WithAppURL(url string) ServerOption {
 	}
 }
 
-func (c serverConfig) eventsHandler(client tools.Client) *events.Handler {
-	if c.appURL == "" {
-		return events.NewHandler(client)
+// WithEventSubscriptions offers webhook delivery of events, keeping subscriptions in store. The host delivers
+// them, with events.Handler.Deliver, and puts each caller's principal in the request context with
+// events.WithPrincipal.
+func WithEventSubscriptions(store events.Store, sender *events.Sender) ServerOption {
+	return func(c *serverConfig) {
+		c.eventStore = store
+		c.eventSender = sender
 	}
-	return events.NewHandler(client, events.WithAppURL(c.appURL))
+}
+
+func (c serverConfig) eventsHandler(client tools.Client) *events.Handler {
+	var opts []events.Option
+	if c.appURL != "" {
+		opts = append(opts, events.WithAppURL(c.appURL))
+	}
+	if c.eventStore != nil {
+		opts = append(opts, events.WithStore(c.eventStore, c.eventSender))
+	}
+	return events.NewHandler(client, opts...)
 }
 
 // WithServerName sets the server name
