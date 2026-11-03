@@ -26,8 +26,10 @@ type searchItem struct {
 
 // Occurrence is one event as the extension delivers it.
 type Occurrence struct {
-	EventID   string         `json:"eventId"`
-	Name      string         `json:"name"`
+	EventID string `json:"eventId"`
+	Name    string `json:"name"`
+	// Subject names what the event is about, as CloudEvents' subject does: a monitor group's episode.
+	Subject   string         `json:"subject"`
 	Timestamp string         `json:"timestamp"`
 	Data      map[string]any `json:"data"`
 }
@@ -48,6 +50,17 @@ func (it searchItem) id() string {
 	}
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return "sha256:" + hex.EncodeToString(sum[:])[:32]
+}
+
+// subject is the event's episode, from the group leaving OK until it recovers, or the monitor group for events
+// from before episodes.
+func (it searchItem) subject() string {
+	monitor := "monitors/" + it.Resource["ed.monitor.id"]
+	if episode := it.Attributes["ed.monitor.episode.id"]; episode != "" {
+		return monitor + "/episodes/" + episode
+	}
+	sum := sha256.Sum256([]byte(it.Attributes["ed.monitor.group.id"]))
+	return monitor + "/groups/" + hex.EncodeToString(sum[:])[:32]
 }
 
 func (it searchItem) occurrence(name, appURL string) Occurrence {
@@ -79,13 +92,17 @@ func (it searchItem) occurrence(name, appURL string) Occurrence {
 	set("evaluatedTo", it.Attributes["ed.monitor.evaluated.to"])
 	set("observationUrl", it.Attributes["ed.monitor.observation.url"])
 	set("screenshotUrl", it.Attributes["ed.monitor.screenshot.url"])
+	set("transition", it.Attributes["ed.monitor.transition.kind"])
+	set("from", it.Attributes["ed.monitor.transition.from"])
+	set("to", it.Attributes["ed.monitor.transition.to"])
+	set("episodeStartedAt", it.Attributes["ed.monitor.episode.start"])
 	if p := patterns(it.Attributes); len(p) > 0 {
 		data["patterns"] = p
 	}
 	if len(it.Resource) > 0 {
 		data["resource"] = it.Resource
 	}
-	return Occurrence{EventID: id, Name: name, Timestamp: at.Format(time.RFC3339Nano), Data: data}
+	return Occurrence{EventID: id, Name: name, Subject: it.subject(), Timestamp: at.Format(time.RFC3339Nano), Data: data}
 }
 
 // patterns are ed.monitor.patterns.0, .1, ... in order.

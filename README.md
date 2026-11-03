@@ -73,14 +73,33 @@ so a client can start work when a monitor alerts, with no model or session in th
 over both HTTP and stdio, and `events/subscribe` and `events/unsubscribe` where the host keeps
 webhook subscriptions (below). Other `events/*` methods answer `-32601`.
 
-| Event | Fires when | Arguments |
-|-------|------------|-----------|
-| `monitor.alert` | a monitor changes state: `ALERT`, `WARN`, `RECOVERED` or `NO DATA` | `monitorId`, `monitor` (name), `type`, `states`, `service`, `query` (more CQL) |
-| `pattern.anomaly` | a pattern anomaly monitor changes state, with the patterns behind it | the same, without `type` |
+Each type is one change of a monitor group's state, as PagerDuty, Datadog and Alertmanager tell an
+alert's lifecycle apart, so a client can start work on a trigger without also starting it on the
+recovery. Every type takes `monitorId`, `monitor` (name), `type`, `service` and `query` (more CQL).
 
-Each event's `eventId` is Edge Delta's `event.id`, and its `data` has the monitor's
-`title`, a `url` to the event in the app, `monitorName`, `state`, `priority`, `service`,
-`message` and more; `events/list` gives the full payload schema.
+| Event | Fires when | Also takes |
+|-------|------------|------------|
+| `monitor.triggered` | a group starts alerting, from `OK` or `NO DATA` to `ALERT` or `WARN`, which starts an episode | `states` (`ALERT`, `WARN`) |
+| `monitor.escalated` | a group that warns starts alerting, `WARN` to `ALERT` | |
+| `monitor.deescalated` | a group that alerts eases to a warning, `ALERT` to `WARN` | |
+| `monitor.renotified` | a group is still out of `OK` at the monitor's renotification interval | `states` (`ALERT`, `WARN`, `NO DATA`) |
+| `monitor.no_data` | a monitor stops seeing data for a group | `from` (`OK`, `ALERT`, `WARN`) |
+| `monitor.recovered` | a group returns to `OK`, ending its episode | `from` (`ALERT`, `WARN`, `NO DATA`) |
+| `pattern.anomaly` | a pattern anomaly monitor changes state at all, with the patterns behind it | `states`, and no `type` |
+
+An episode runs from a group leaving `OK` until it recovers. Each event's `subject`, CloudEvents'
+name for what an event is about, names its episode (`monitors/<id>/episodes/<episode>`), the same on
+the trigger, escalations, reminders and the recovery, so a client can route them all to the work the
+trigger started. `eventId` is Edge Delta's `event.id`, unique per event. `data` has the transition
+(`from` and `to`, `OK` once recovered), `episodeStartedAt`, the monitor's `title`, a `url` to the event
+in the app, `monitorName`, `state`, `priority`, `service`, `message`, the window it evaluated and more;
+`events/list` gives the full payload schema.
+
+Escalation and de-escalation are types of their own, not `monitor.triggered` with a `from`, so that
+wiring `monitor.triggered` to a workflow starts it when a group starts alerting, not again when its
+warning turns into an alert. Edge Delta applies a monitor's evaluations in order and once each, so a
+window is never reported twice or after a later one. The `monitor.*` types find the events Edge Delta
+wrote since it began recording their transition; `pattern.anomaly` finds older ones too.
 
 Polling follows the SEP: a `null` cursor starts from now, `maxEvents` (default 50, at most
 100) batches with `hasMore`, `maxAgeMs` bounds replay (as does a seven-day ceiling), and
@@ -91,8 +110,8 @@ event indexed late still arrives, once. Poll every 30 seconds (`nextPollMs`).
 ```bash
 curl -s https://api.edgedelta.com/v1/orgs/$ED_ORG_ID/mcp \
   -H "X-ED-API-Token: $ED_API_TOKEN" -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' -H 'Mcp-Name: monitor.alert' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"events/poll","params":{"name":"monitor.alert","arguments":{"states":["ALERT"]},"cursor":null}}'
+  -H 'Accept: application/json, text/event-stream' -H 'Mcp-Name: monitor.triggered' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"events/poll","params":{"name":"monitor.triggered","arguments":{"states":["ALERT"]},"cursor":null}}'
 ```
 
 Errors use the SEP's provisional codes: `-32023` NotFound (`data.kind: "event"`) for an
