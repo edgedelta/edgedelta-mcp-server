@@ -55,7 +55,7 @@ func (f *fakeSearch) Do(req *http.Request) (*http.Response, error) {
 	}
 	var items []searchItem
 	for _, it := range f.indexed {
-		if it.Timestamp >= from.UnixMilli() && it.Timestamp <= to.UnixMilli() {
+		if it.Timestamp > from.UnixMilli() && it.Timestamp <= to.UnixMilli() {
 			items = append(items, it)
 		}
 	}
@@ -143,6 +143,22 @@ func TestPollSequence(t *testing.T) {
 				{at: time.Minute, maxEvents: ptr(2), want: []string{"c", "d"}, hasMore: true},
 				{at: time.Minute, maxEvents: ptr(2), want: []string{"e"}},
 				{at: 2 * time.Minute, maxEvents: ptr(2), want: []string{}},
+			},
+		},
+		{
+			desc: "drains a settled backlog, the watermark at a tie",
+			steps: []step{
+				{at: 0, want: []string{}},
+				{
+					at: 10 * time.Minute,
+					index: []searchItem{
+						alert("a", t0.Add(time.Second)), alert("b", t0.Add(2*time.Second)),
+						alert("c", t0.Add(2*time.Second)), alert("d", t0.Add(2*time.Second)), alert("e", t0.Add(3*time.Second)),
+					},
+					maxEvents: ptr(2), want: []string{"a", "b"}, hasMore: true,
+				},
+				{at: 10 * time.Minute, maxEvents: ptr(2), want: []string{"c", "d"}, hasMore: true},
+				{at: 10 * time.Minute, maxEvents: ptr(2), want: []string{"e"}},
 			},
 		},
 		{
