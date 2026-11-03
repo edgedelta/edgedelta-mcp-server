@@ -274,9 +274,9 @@ func (h *Handler) search(ctx context.Context, query string, from, to int64, limi
 	if to < from {
 		return nil, nil
 	}
-	// The API refuses from == to, so a single millisecond is searched with the next one, which is dropped.
-	items, e := h.searchRange(ctx, query, from, max(to, from+1), limit)
-	return slices.DeleteFunc(items, func(it searchItem) bool { return it.Timestamp > to }), e
+	// The API's from is exclusive in ascending order, so the search starts a millisecond early.
+	items, e := h.searchRange(ctx, query, from-1, to, limit)
+	return slices.DeleteFunc(items, func(it searchItem) bool { return it.Timestamp < from }), e
 }
 
 func (h *Handler) searchRange(ctx context.Context, query string, from, to int64, limit int) ([]searchItem, *Error) {
