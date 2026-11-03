@@ -74,18 +74,18 @@ func TestHTTPEvents(t *testing.T) {
 				}
 				return names
 			},
-			want: []any{"monitor.alert", "pattern.anomaly"},
+			want: []any{"monitor.triggered", "monitor.escalated", "monitor.deescalated", "monitor.renotified", "monitor.no_data", "monitor.recovered", "pattern.anomaly"},
 		},
 		{
 			desc:   "other events methods are not found",
-			body:   `{"jsonrpc":"2.0","id":3,"method":"events/stream","params":{"name":"monitor.alert"}}`,
+			body:   `{"jsonrpc":"2.0","id":3,"method":"events/stream","params":{"name":"monitor.triggered"}}`,
 			status: http.StatusOK,
 			check:  func(r map[string]any) any { return dig(r, "error", "code") },
 			want:   float64(-32601),
 		},
 		{
 			desc:   "a mismatched Mcp-Name is refused",
-			body:   `{"jsonrpc":"2.0","id":4,"method":"events/poll","params":{"name":"monitor.alert","cursor":null}}`,
+			body:   `{"jsonrpc":"2.0","id":4,"method":"events/poll","params":{"name":"monitor.triggered","cursor":null}}`,
 			header: http.Header{"Mcp-Name": {"pattern.anomaly"}},
 			status: http.StatusBadRequest,
 			check:  func(r map[string]any) any { return dig(r, "error", "code") },
@@ -186,7 +186,10 @@ func TestHTTPEventsWithSubscriptions(t *testing.T) {
 	for _, e := range dig(got, "result", "events").([]any) {
 		delivery = append(delivery, e.(map[string]any)["delivery"])
 	}
-	want := []any{[]any{"poll", "webhook"}, []any{"poll", "webhook"}}
+	var want []any
+	for range 7 {
+		want = append(want, []any{"poll", "webhook"})
+	}
 	if diff := cmp.Diff(want, delivery); diff != "" {
 		t.Errorf("delivery mismatch (-want, +got): %v", diff)
 	}

@@ -131,8 +131,8 @@ func TestDeliverCarriesCursorAndSubscription(t *testing.T) {
 		t.Fatalf("deliver: %v", err)
 	}
 	got := r.received[0]
-	if got["subscription"] != sub.ID || got["cursor"] != s.Cursor || got["name"] != monitorAlert {
-		t.Errorf("delivery got: subscription %v, cursor %v, name %v, want: %v, %v, %v", got["subscription"], got["cursor"], got["name"], sub.ID, s.Cursor, monitorAlert)
+	if got["subscription"] != sub.ID || got["cursor"] != s.Cursor || got["name"] != monitorTriggered {
+		t.Errorf("delivery got: subscription %v, cursor %v, name %v, want: %v, %v, %v", got["subscription"], got["cursor"], got["name"], sub.ID, s.Cursor, monitorTriggered)
 	}
 }
 

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,7 +204,7 @@ func TestPollSequence(t *testing.T) {
 		for i, s := range tc.steps {
 			now = t0.Add(s.at)
 			search.indexed = append(search.indexed, s.index...)
-			got, e := h.Poll(orgContext(), PollParams{Name: monitorAlert, Cursor: cur, MaxEvents: s.maxEvents, MaxAgeMs: s.maxAgeMs})
+			got, e := h.Poll(orgContext(), PollParams{Name: monitorTriggered, Cursor: cur, MaxEvents: s.maxEvents, MaxAgeMs: s.maxAgeMs})
 			if e != nil {
 				t.Fatalf("%s: poll %d: %+v", tc.desc, i, e)
 			}
@@ -227,7 +229,7 @@ func TestPollTieGroup(t *testing.T) {
 	search := &fakeSearch{}
 	now := t0
 	h := NewHandler(search, WithClock(func() time.Time { return now }))
-	started, e := h.Poll(orgContext(), PollParams{Name: monitorAlert})
+	started, e := h.Poll(orgContext(), PollParams{Name: monitorTriggered})
 	if e != nil {
 		t.Fatalf("start: %+v", e)
 	}
@@ -239,7 +241,7 @@ func TestPollTieGroup(t *testing.T) {
 
 	cur, seen, truncated := started.Cursor, map[string]bool{}, 0
 	for i := 0; ; i++ {
-		got, e := h.Poll(orgContext(), PollParams{Name: monitorAlert, Cursor: &cur, MaxEvents: ptr(maxMaxEvents)})
+		got, e := h.Poll(orgContext(), PollParams{Name: monitorTriggered, Cursor: &cur, MaxEvents: ptr(maxMaxEvents)})
 		if e != nil {
 			t.Fatalf("poll %d: %+v", i, e)
 		}
@@ -272,13 +274,13 @@ func TestPollWatermark(t *testing.T) {
 	search := &fakeSearch{}
 	now := t0
 	h := NewHandler(search, WithClock(func() time.Time { return now }))
-	started, e := h.Poll(orgContext(), PollParams{Name: monitorAlert})
+	started, e := h.Poll(orgContext(), PollParams{Name: monitorTriggered})
 	if e != nil {
 		t.Fatalf("start: %+v", e)
 	}
 	now = t0.Add(10 * time.Minute)
 	search.indexed = []searchItem{alert("a", t0.Add(9*time.Minute)), alert("b", t0.Add(time.Minute))}
-	got, e := h.Poll(orgContext(), PollParams{Name: monitorAlert, Cursor: &started.Cursor})
+	got, e := h.Poll(orgContext(), PollParams{Name: monitorTriggered, Cursor: &started.Cursor})
 	if e != nil {
 		t.Fatalf("poll: %+v", e)
 	}
@@ -302,17 +304,21 @@ func TestPollErrors(t *testing.T) {
 		data   any
 	}{
 		{desc: "unknown type", params: PollParams{Name: "nope"}, want: codeNotFound, data: map[string]any{"kind": "event"}},
-		{desc: "unknown argument", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"color": "red"}}, want: codeInvalidParams},
-		{desc: "unknown state", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"states": []any{"ON FIRE"}}}, want: codeInvalidParams},
-		{desc: "unknown monitor type", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"type": "vibes"}}, want: codeInvalidParams},
+		{desc: "unknown argument", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"color": "red"}}, want: codeInvalidParams},
+		{desc: "unknown state", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"states": []any{"ON FIRE"}}}, want: codeInvalidParams},
+		{desc: "state the type never moves to", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"states": []any{"RECOVERED"}}}, want: codeInvalidParams},
+		{desc: "states on a type of one state", params: PollParams{Name: monitorRecovered, Arguments: map[string]any{"states": []any{"RECOVERED"}}}, want: codeInvalidParams},
+		{desc: "from on triggers", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"from": []any{"OK"}}}, want: codeInvalidParams},
+		{desc: "recovery from OK", params: PollParams{Name: monitorRecovered, Arguments: map[string]any{"from": []any{"OK"}}}, want: codeInvalidParams},
+		{desc: "unknown monitor type", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"type": "vibes"}}, want: codeInvalidParams},
 		{desc: "type on pattern.anomaly", params: PollParams{Name: patternAnomaly, Arguments: map[string]any{"type": "log_threshold"}}, want: codeInvalidParams},
-		{desc: "query out of its group", params: PollParams{Name: monitorAlert, Arguments: map[string]any{"query": "x) OR (event.domain:*"}}, want: codeInvalidParams},
-		{desc: "maxEvents of zero", params: PollParams{Name: monitorAlert, MaxEvents: ptr(0)}, want: codeInvalidParams},
-		{desc: "foreign cursor", params: PollParams{Name: monitorAlert, Cursor: ptr("abc")}, want: codeInvalidParams},
-		{desc: "search forbids", params: PollParams{Name: monitorAlert, Cursor: ptr(validCursor(t))}, status: http.StatusForbidden, want: codeForbidden},
-		{desc: "search refuses the query", params: PollParams{Name: monitorAlert, Cursor: ptr(validCursor(t))}, status: http.StatusBadRequest, want: codeInvalidParams},
-		{desc: "search fails", params: PollParams{Name: monitorAlert, Cursor: ptr(validCursor(t))}, status: http.StatusBadGateway, want: codeInternal},
-		{desc: "no organization", params: PollParams{Name: monitorAlert, Cursor: ptr(validCursor(t))}, ctx: context.Background(), want: codeForbidden},
+		{desc: "query out of its group", params: PollParams{Name: monitorTriggered, Arguments: map[string]any{"query": "x) OR (event.domain:*"}}, want: codeInvalidParams},
+		{desc: "maxEvents of zero", params: PollParams{Name: monitorTriggered, MaxEvents: ptr(0)}, want: codeInvalidParams},
+		{desc: "foreign cursor", params: PollParams{Name: monitorTriggered, Cursor: ptr("abc")}, want: codeInvalidParams},
+		{desc: "search forbids", params: PollParams{Name: monitorTriggered, Cursor: ptr(validCursor(t))}, status: http.StatusForbidden, want: codeForbidden},
+		{desc: "search refuses the query", params: PollParams{Name: monitorTriggered, Cursor: ptr(validCursor(t))}, status: http.StatusBadRequest, want: codeInvalidParams},
+		{desc: "search fails", params: PollParams{Name: monitorTriggered, Cursor: ptr(validCursor(t))}, status: http.StatusBadGateway, want: codeInternal},
+		{desc: "no organization", params: PollParams{Name: monitorTriggered, Cursor: ptr(validCursor(t))}, ctx: context.Background(), want: codeForbidden},
 	}
 	for _, tc := range tests {
 		ctx := tc.ctx
@@ -352,19 +358,39 @@ func TestQuery(t *testing.T) {
 		args map[string]any
 		want string
 	}{
-		{desc: "no arguments", name: monitorAlert, want: `event.domain:("Monitor" OR "Monitor Alerts")`},
+		{desc: "no arguments", name: monitorTriggered, want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"triggered"`},
+		{desc: "escalations", name: monitorEscalated, want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"escalated"`},
 		{desc: "pattern anomalies", name: patternAnomaly, want: `event.domain:("Monitor" OR "Monitor Alerts") AND event.type:"pattern_anomaly"`},
 		{
 			desc: "every argument",
-			name: monitorAlert,
+			name: monitorTriggered,
 			args: map[string]any{
 				"monitorId": "mon1", "monitor": `Say "hi"`, "service": "api", "type": "log_threshold",
-				"states": []any{"ALERT", "NO DATA"}, "query": `@ed.monitor.priority:"High"`,
+				"states": []any{"ALERT", "WARN"}, "query": `@ed.monitor.priority:"High"`,
 			},
-			want: `event.domain:("Monitor" OR "Monitor Alerts") AND event.name:"Say \"hi\"" AND ed.monitor.id:"mon1"` +
-				` AND (@ed.monitor.priority:"High") AND service.name:"api" AND severity_text:("ALERT" OR "NO DATA") AND event.type:"log_threshold"`,
+			want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"triggered" AND event.name:"Say \"hi\""` +
+				` AND ed.monitor.id:"mon1" AND (@ed.monitor.priority:"High") AND service.name:"api" AND severity_text:("ALERT" OR "WARN")` +
+				` AND event.type:"log_threshold"`,
 		},
-		{desc: "empty values", name: monitorAlert, args: map[string]any{"monitor": "", "states": []any{}}, want: `event.domain:("Monitor" OR "Monitor Alerts")`},
+		{
+			desc: "recoveries from alerts",
+			name: monitorRecovered,
+			args: map[string]any{"from": []any{"ALERT"}},
+			want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"recovered" AND @ed.monitor.transition.from:("ALERT")`,
+		},
+		{
+			desc: "renotified no data",
+			name: monitorRenotified,
+			args: map[string]any{"states": []any{"NO DATA"}},
+			want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"renotified" AND severity_text:("NO DATA")`,
+		},
+		{
+			desc: "pattern anomaly recoveries",
+			name: patternAnomaly,
+			args: map[string]any{"states": []any{"RECOVERED"}},
+			want: `event.domain:("Monitor" OR "Monitor Alerts") AND event.type:"pattern_anomaly" AND severity_text:("RECOVERED")`,
+		},
+		{desc: "empty values", name: monitorTriggered, args: map[string]any{"monitor": "", "states": []any{}}, want: `event.domain:("Monitor" OR "Monitor Alerts") AND @ed.monitor.transition.kind:"triggered"`},
 	}
 	for _, tc := range tests {
 		typ, ok := lookupType(tc.name)
@@ -424,6 +450,7 @@ func TestOccurrence(t *testing.T) {
 	want := Occurrence{
 		EventID:   "3LYTvn0VvZmW9VzAvVnuApLTmSH",
 		Name:      patternAnomaly,
+		Subject:   "monitors/mon1/groups/e3b0c44298fc1c149afbf4c8996fb924",
 		Timestamp: "2026-11-02T14:36:59.919Z",
 		Data: map[string]any{
 			"title":       "Default Pattern Anomaly Monitor for service.name:http-receiver",
@@ -442,6 +469,36 @@ func TestOccurrence(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, it.occurrence(patternAnomaly, "https://app.edgedelta.com")); diff != "" {
 		t.Errorf("occurrence mismatch (-want, +got): %v", diff)
+	}
+
+	escalated := it
+	escalated.SeverityText = "ALERT"
+	escalated.Attributes = map[string]string{
+		"event.id":                   "3LYU0sWQ3bXWkcRHEbXr8w6eXrO",
+		"ed.monitor.group.id":        "yYcvDgekpBUwxkEW+XJsojqVz4qSlj08vmU+An+k2Ek=",
+		"ed.monitor.transition.kind": "escalated",
+		"ed.monitor.transition.from": "WARN",
+		"ed.monitor.transition.to":   "ALERT",
+		"ed.monitor.episode.id":      "9f86d081884c7d659a2feaa0c55ad015",
+		"ed.monitor.episode.start":   "2026-11-02T14:20:00.000Z",
+	}
+	got := escalated.occurrence(monitorEscalated, "https://app.edgedelta.com")
+	if want := "monitors/mon1/episodes/9f86d081884c7d659a2feaa0c55ad015"; got.Subject != want {
+		t.Errorf("subject got: %v, want: %v", got.Subject, want)
+	}
+	for k, v := range map[string]any{"transition": "escalated", "from": "WARN", "to": "ALERT", "episodeStartedAt": "2026-11-02T14:20:00.000Z"} {
+		if got.Data[k] != v {
+			t.Errorf("data.%s got: %v, want: %v", k, got.Data[k], v)
+		}
+	}
+
+	other := escalated
+	other.Attributes = maps.Clone(escalated.Attributes)
+	delete(other.Attributes, "ed.monitor.episode.id")
+	group := other.subject()
+	other.Attributes["ed.monitor.group.id"] = "another"
+	if !strings.HasPrefix(group, "monitors/mon1/groups/") || group == other.subject() {
+		t.Errorf("subjects without an episode got: %v and %v, want one per monitor group", group, other.subject())
 	}
 
 	legacy := it
@@ -467,27 +524,27 @@ func TestHandle(t *testing.T) {
 		},
 		{
 			desc:   "starts a poll",
-			body:   `{"jsonrpc":"2.0","id":"x","method":"events/poll","params":{"name":"monitor.alert","arguments":{},"cursor":null}}`,
+			body:   `{"jsonrpc":"2.0","id":"x","method":"events/poll","params":{"name":"monitor.triggered","arguments":{},"cursor":null}}`,
 			status: http.StatusOK,
 			want:   `{"jsonrpc":"2.0","id":"x","result":{"resultType":"complete","events":[],"cursor":"...","truncated":false,"hasMore":false,"nextPollMs":30000}}`,
 		},
 		{
 			desc:    "takes a matching Mcp-Name",
-			body:    `{"jsonrpc":"2.0","id":2,"method":"events/poll","params":{"name":"monitor.alert","cursor":null}}`,
-			mcpName: "=?base64?bW9uaXRvci5hbGVydA==?=",
+			body:    `{"jsonrpc":"2.0","id":2,"method":"events/poll","params":{"name":"monitor.triggered","cursor":null}}`,
+			mcpName: "=?base64?bW9uaXRvci50cmlnZ2VyZWQ=?=",
 			status:  http.StatusOK,
 			want:    `{"jsonrpc":"2.0","id":2,"result":{"resultType":"complete","events":[],"cursor":"...","truncated":false,"hasMore":false,"nextPollMs":30000}}`,
 		},
 		{
 			desc:    "refuses a mismatched Mcp-Name",
-			body:    `{"jsonrpc":"2.0","id":3,"method":"events/poll","params":{"name":"monitor.alert","cursor":null}}`,
+			body:    `{"jsonrpc":"2.0","id":3,"method":"events/poll","params":{"name":"monitor.triggered","cursor":null}}`,
 			mcpName: "pattern.anomaly",
 			status:  http.StatusBadRequest,
-			want:    `{"jsonrpc":"2.0","id":3,"error":{"code":-32020,"message":"Mcp-Name \"pattern.anomaly\" does not match params.name \"monitor.alert\""}}`,
+			want:    `{"jsonrpc":"2.0","id":3,"error":{"code":-32020,"message":"Mcp-Name \"pattern.anomaly\" does not match params.name \"monitor.triggered\""}}`,
 		},
 		{
 			desc:   "has no webhooks yet",
-			body:   `{"jsonrpc":"2.0","id":4,"method":"events/subscribe","params":{"name":"monitor.alert"}}`,
+			body:   `{"jsonrpc":"2.0","id":4,"method":"events/subscribe","params":{"name":"monitor.triggered"}}`,
 			status: http.StatusOK,
 			want:   `{"jsonrpc":"2.0","id":4,"error":{"code":-32601,"message":"webhook delivery is not offered here"}}`,
 		},

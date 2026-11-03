@@ -199,13 +199,13 @@ func orgPrincipalContext(orgID, principal string) context.Context {
 }
 
 func unsubscribeParams(url string) UnsubscribeParams {
-	p := UnsubscribeParams{Name: monitorAlert}
+	p := UnsubscribeParams{Name: monitorTriggered}
 	p.Delivery.URL = url
 	return p
 }
 
 func subscribeParams(url string) SubscribeParams {
-	return SubscribeParams{Name: monitorAlert, Arguments: map[string]any{}, Delivery: deliveryParams{URL: url, Secret: testSecret}}
+	return SubscribeParams{Name: monitorTriggered, Arguments: map[string]any{}, Delivery: deliveryParams{URL: url, Secret: testSecret}}
 }
 
 func TestSubscribe(t *testing.T) {
