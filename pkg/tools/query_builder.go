@@ -25,14 +25,14 @@ type CQLBuildResult struct {
 	Valid           bool                `json:"valid"`
 	Query           string              `json:"query,omitempty"`
 	ValidatedFields []string            `json:"validated_fields,omitempty"`
-	UnknownFields   []string            `json:"unknown_fields,omitempty"`
+	UnknownFields   []string            `json:"unknown_fields,omitempty" jsonschema:"Check them with discover_schema or facets."`
 	Errors          []string            `json:"errors,omitempty"`
 	Suggestions     []string            `json:"suggestions,omitempty"`
 	Guidance        *ValidationGuidance `json:"guidance,omitempty"`
 }
 
 type ValidationGuidance struct {
-	ResultStatus string   `json:"result_status"`
+	ResultStatus string   `json:"result_status" jsonschema:"valid, invalid or success."`
 	NextSteps    []string `json:"next_steps,omitempty"`
 }
 
@@ -60,6 +60,7 @@ var CommonFacetKeys = map[string][]string{
 // GetValidateCQLTool creates a tool to validate CQL queries before execution
 func GetValidateCQLTool() (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("validate_cql",
+			outputSchema[CQLValidationResult](),
 			mcp.WithTitleAnnotation("Validate CQL Query"),
 			mcp.WithDescription(`Validates a CQL (Common Query Language) query BEFORE executing search.
 
@@ -110,13 +111,14 @@ Returns validation result with errors, warnings, and suggestions for fixes.`),
 
 			result := validateCQL(query, scope)
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetBuildCQLTool creates a tool to build valid CQL queries from structured parameters
 func GetBuildCQLTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("build_cql",
+			outputSchema[CQLBuildResult](),
 			mcp.WithTitleAnnotation("Build CQL Query"),
 			mcp.WithDescription(`Constructs a valid CQL query from structured filter parameters.
 
@@ -184,7 +186,7 @@ Output: service.name:"api" AND severity_text:("ERROR" OR "WARN")`),
 
 			result := buildCQL(scope, filters)
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 

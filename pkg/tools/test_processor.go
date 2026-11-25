@@ -67,6 +67,7 @@ func stringArrayParam(request mcp.CallToolRequest, name string) ([]string, error
 // TestPipelineOTTLTool creates a tool that dry-runs OTTL statements against sample OTEL logs.
 func TestPipelineOTTLTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("test_pipeline_ottl",
+			outputSchema[PipelineToolResponse](doc("data", "The items after the statements ran.")),
 			mcp.WithTitleAnnotation("Test Pipeline OTTL"),
 			mcp.WithDescription(`Dry-run OTTL (OpenTelemetry Transformation Language) statements against sample OTEL log
 items WITHOUT saving or deploying any pipeline configuration. This is the offline complement
@@ -121,7 +122,7 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -136,13 +137,14 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // TestPipelineNodeTool creates a tool that dry-runs any processor node against sample OTEL logs.
 func TestPipelineNodeTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("test_pipeline_node",
+			outputSchema[PipelineToolResponse](doc("data", "The items the node emitted, by output path.")),
 			mcp.WithTitleAnnotation("Test Pipeline Node"),
 			mcp.WithDescription(`Dry-run a full processor node of ANY type against sample OTEL log items WITHOUT saving or
 deploying. This complements test_pipeline_ottl: use it for non-OTTL node types such as
@@ -203,7 +205,7 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -218,6 +220,6 @@ PREREQUISITE: Call get_pipelines tool first to obtain the conf_id.`),
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }

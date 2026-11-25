@@ -12,7 +12,7 @@ import (
 )
 
 type FacetKey struct {
-	Key string `json:"key"`
+	Key string `json:"key" jsonschema:"A field path that can be queried."`
 }
 
 type FacetKeysResourceResponse struct {

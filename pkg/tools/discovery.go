@@ -11,9 +11,9 @@ import (
 )
 
 type SchemaDiscovery struct {
-	Scope            string              `json:"scope"`
-	FacetKeys        []FacetKey          `json:"facet_keys"`
-	CommonFields     map[string][]string `json:"common_fields,omitempty"`
+	Scope            string              `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
+	FacetKeys        []FacetKey          `json:"facet_keys" jsonschema:"The fields that can be queried."`
+	CommonFields     map[string][]string `json:"common_fields,omitempty" jsonschema:"Sample values of a few fields, by field path. Call facet_options for any other field."`
 	CommonFieldsNote string              `json:"common_fields_note,omitempty"`
 	QuerySyntax      QuerySyntaxRef      `json:"query_syntax"`
 	AttributeSyntax  map[string]string   `json:"attribute_syntax,omitempty"`
@@ -22,7 +22,7 @@ type SchemaDiscovery struct {
 }
 
 type DiscoveryGuidance struct {
-	ResultStatus string   `json:"result_status"`
+	ResultStatus string   `json:"result_status" jsonschema:"success, partial or empty."`
 	NextSteps    []string `json:"next_steps,omitempty"`
 	Suggestions  []string `json:"suggestions,omitempty"`
 }
@@ -41,16 +41,16 @@ type QuerySyntaxRef struct {
 
 type MetricSearchResult struct {
 	Pattern    string             `json:"pattern"`
-	Matches    []MetricMatch      `json:"matches"`
+	Matches    []MetricMatch      `json:"matches" jsonschema:"Best match first."`
 	TotalFound int                `json:"total_found"`
 	Usage      string             `json:"usage"`
 	Guidance   *DiscoveryGuidance `json:"guidance,omitempty"`
 }
 
 type MetricMatch struct {
-	Name  string  `json:"name"`
+	Name  string  `json:"name" jsonschema:"The exact name get_metric_search and get_metric_graph take."`
 	Count int     `json:"count,omitempty"`
-	Score float64 `json:"score,omitempty"`
+	Score float64 `json:"score,omitempty" jsonschema:"Higher is a closer match."`
 }
 
 var defaultQuerySyntax = QuerySyntaxRef{
@@ -124,6 +124,7 @@ var sampleQueriesByScope = map[string][]string{
 // GetDiscoverSchemaTool creates a tool to discover available schema for building queries
 func GetDiscoverSchemaTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("discover_schema",
+			outputSchema[SchemaDiscovery](),
 			mcp.WithTitleAnnotation("Discover Schema"),
 			mcp.WithDescription(`Discovers available data schema for building queries.
 
@@ -234,13 +235,14 @@ After calling this tool, use build_cql tool to construct queries from structured
 			}
 
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetSearchMetricsTool creates a tool for fuzzy metric name search
 func GetSearchMetricsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("search_metrics",
+			outputSchema[MetricSearchResult](),
 			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Searches for metric names using fuzzy/partial matching.
 
@@ -322,7 +324,7 @@ Use the exact metric name from results in get_metric_search tool or get_metric_g
 			}
 
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 

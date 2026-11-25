@@ -76,6 +76,7 @@ func clampFloat(v, min, max float64) float64 {
 // StartPipelineCaptureTool creates a tool that starts a live-capture task on a pipeline.
 func StartPipelineCaptureTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("start_pipeline_capture",
+			outputSchema[PipelineToolResponse](doc("data", "The capture task; its id is get_pipeline_capture_status' task_id.")),
 			mcp.WithTitleAnnotation("Start Pipeline Capture"),
 			mcp.WithDescription(`Start a live-capture task on a pipeline to sample real before/after data flowing through its nodes.
 
@@ -181,7 +182,7 @@ Workflow:
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -195,13 +196,14 @@ Workflow:
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetPipelineCaptureStatusTool creates a tool that checks the status of a live-capture task.
 func GetPipelineCaptureStatusTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_status",
+			outputSchema[PipelineToolResponse](doc("data", "Each agent's status, in capture_status.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Status"),
 			mcp.WithDescription(`Check the status of a pipeline live-capture task.
 
@@ -236,7 +238,7 @@ get_pipeline_capture_results to fetch the captured before/after samples.`),
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -250,13 +252,14 @@ get_pipeline_capture_results to fetch the captured before/after samples.`),
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetPipelineCaptureResultsTool creates a tool that fetches captured before/after samples for a pipeline.
 func GetPipelineCaptureResultsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_results",
+			outputSchema[PipelineToolResponse](doc("data", "Each node's samples from before and after it.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Results"),
 			mcp.WithDescription(`Fetch captured live-capture results for a pipeline.
 
@@ -295,7 +298,7 @@ happened (e.g. a field present in "after" but not in "before").`),
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -309,13 +312,14 @@ happened (e.g. a field present in "after" but not in "before").`),
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetPipelineCaptureTaskTool creates a tool that fetches the active live-capture task for a pipeline, if any.
 func GetPipelineCaptureTaskTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_task",
+			outputSchema[PipelineToolResponse](doc("data", "The active capture task, if any.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Task"),
 			mcp.WithDescription(`Get the currently active live-capture task for a pipeline, if any.
 
@@ -349,7 +353,7 @@ Returns the active task (id, expiry, max_items) or an empty result if no capture
 			}
 
 			response := PipelineToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &PipelineGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -363,6 +367,6 @@ Returns the active task (id, expiry, max_items) or an empty result if no capture
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }

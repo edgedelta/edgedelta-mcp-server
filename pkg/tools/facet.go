@@ -15,13 +15,13 @@ import (
 
 type Facet struct {
 	Name    string        `json:"name"`
-	Path    string        `json:"path,omitempty"`
-	Scope   string        `json:"scope,omitempty"`
+	Path    string        `json:"path,omitempty" jsonschema:"The field path, for CQL and facet_options."`
+	Scope   string        `json:"scope,omitempty" jsonschema:"log, metric, trace, pattern or event."`
 	Options []FacetOption `json:"options,omitempty"`
 }
 
 type FacetOption struct {
-	Name  string `json:"name"`
+	Name  string `json:"name" jsonschema:"Use in CQL as path:\"value\"."`
 	Count int    `json:"count,omitempty"`
 }
 
@@ -31,26 +31,27 @@ type FacetsResponse struct {
 }
 
 type FacetsToolResponse struct {
-	Scope    string         `json:"scope"`
-	Facets   []Facet        `json:"facets"`
+	Scope    string         `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
+	Facets   []Facet        `json:"facets" jsonschema:"Built-in facets first, then user-defined ones."`
 	Guidance *FacetGuidance `json:"guidance,omitempty"`
 }
 
 type FacetGuidance struct {
-	ResultStatus string   `json:"result_status"`
+	ResultStatus string   `json:"result_status" jsonschema:"success or empty."`
 	NextSteps    []string `json:"next_steps,omitempty"`
 	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
 type FacetOptionsResponse struct {
 	FacetPath   string         `json:"facet_path"`
-	Scope       string         `json:"scope"`
+	Scope       string         `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
 	TotalValues int            `json:"total_values"`
 	Options     []FacetOption  `json:"options"`
 	Guidance    *FacetGuidance `json:"guidance,omitempty"`
 }
 
 var FacetsTool = mcp.NewTool("facets",
+	outputSchema[FacetsToolResponse](),
 	mcp.WithTitleAnnotation("Get Facets"),
 	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
 
@@ -79,6 +80,7 @@ var FacetsResource = mcp.NewResourceTemplate(
 )
 
 var FacetOptionsTool = mcp.NewTool("facet_options",
+	outputSchema[FacetOptionsResponse](),
 	mcp.WithTitleAnnotation("Get Facet Options"),
 	mcp.WithDescription(`Retrieves all available values for a specific field (facet) in the given scope.
 
@@ -159,7 +161,7 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}
 
-		return mcp.NewToolResultText(string(r)), nil
+		return structuredResult(r), nil
 	}
 }
 
@@ -252,7 +254,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}
 
-		return mcp.NewToolResultText(string(r)), nil
+		return structuredResult(r), nil
 	}
 }
 
