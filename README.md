@@ -147,6 +147,56 @@ The store's `Put` and `Delete` must apply only while a subscription is at the `V
   stops while a post still has time to finish. A save that returns `ErrConflict` should be dropped: the
   events go again next run.
 
+## Skills
+
+The server offers Edge Delta's agent skills (`ed-logs`, `ed-metrics`, `ed-investigate`, `ed-monitors`, ...)
+through the MCP Skills extension, `io.modelcontextprotocol/skills`
+([SEP-2640](https://modelcontextprotocol.io/seps/2640-skills-extension)), so a client such as the
+TypeScript SDK's `SkillsClient` can list them and load them into an agent.
+
+`initialize` advertises the extension with `{"directoryRead": true}`, and the server answers, over both
+HTTP and stdio:
+
+- `skills/list`: every skill's entry, sorted by URI and paged with an opaque `cursor`. An entry has the
+  `uri` of its `SKILL.md` (`skill://<skill>/SKILL.md`), its `frontmatter` exactly as `SKILL.md` has it
+  (`name`, `description`, `metadata`, and `disable-model-invocation` and other fields where set), and its
+  `resources`: every file of the skill, `SKILL.md` included, as `{uri, size, digest}`, the digest being
+  `sha256:` and the hex SHA-256 of the file's bytes.
+- `skills/get` with `{"uri": "skill://<skill>/SKILL.md"}`: that skill's entry.
+- `resources/read` of any `skill://<skill>/<path>`: the file, as `text` (or a base64 `blob` when it isn't
+  UTF-8) whose bytes match its listed size and digest.
+- `resources/directory/read` of a skill's folder or a folder in it: its direct children, folders as
+  `inode/directory`.
+
+Results carry `resultType: "complete"`, `ttlMs: 300000` and `cacheScope: "public"`: the skills are built
+into the binary and the same for every caller. An unknown skill, file, directory or cursor is `-32602`.
+`resources/list` lists each skill's `SKILL.md` too.
+
+```sh
+curl -s localhost:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"skills/get","params":{"uri":"skill://ed-logs/SKILL.md"}}'
+```
+
+The skills are authored in the `edx` repository, mirrored to
+[edgedelta/agent-skills](https://github.com/edgedelta/agent-skills), and synced from there into
+[`pkg/skills/data`](pkg/skills/data) by `script/sync-skills [ref]`, which records the commit in
+[`pkg/skills/SOURCE`](pkg/skills/SOURCE). `go:embed` builds them into the binary, so every way of building
+the server (the container image, GoReleaser, `go install`) serves the skills of its commit, with no files
+to ship next to it. Every file of each `ed-*` folder ships; dotfiles don't. To update them:
+
+```sh
+script/sync-skills            # or SKILLS_REPO=../agent-skills script/sync-skills origin/main
+go test ./pkg/skills
+```
+
+The test fails on a skill the extension or Agent Skills would refuse: a `name` that isn't its folder's, a
+missing `description`, a frontmatter value that reads differently as JSON (an unquoted date), a non-string
+`metadata` value, a file name that needs percent-encoding in a URI, or more than 512 files or 16 MiB.
+
+A host embedding the server picks the skills with `server.WithSkills(catalog)`, where
+`skills.NewCatalog(fsys)` reads any folder of skills; `WithSkills(nil)` offers none and leaves the
+extension undeclared. As with events, mount `MCPHTTPServer.Handler()`, not `HTTPServer()`.
+
 ## Prerequisites
 
 1. **Docker Engine ≥ 20.10** installed *and running*.

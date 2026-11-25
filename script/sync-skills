@@ -1,0 +1,37 @@
+#!/bin/bash
+# Copies the ed-* agent skills into pkg/skills/data, which the server embeds and serves through the MCP Skills
+# extension. Every file of each skill's folder is copied; the source commit is written to pkg/skills/SOURCE.
+#
+# Usage: script/sync-skills [ref]
+#   ref                 git ref of edgedelta/agent-skills to copy (default: main)
+#   SKILLS_REPO=<path>  read from this local clone instead of cloning from GitHub (its refs are used as they are;
+#                       fetch it first)
+set -euo pipefail
+
+ref="${1:-main}"
+root="$(cd "$(dirname "$0")/.." && pwd)"
+dest="${root}/pkg/skills/data"
+url="https://github.com/edgedelta/agent-skills"
+
+repo="${SKILLS_REPO:-}"
+if [ -z "${repo}" ]; then
+    repo="$(mktemp -d)"
+    trap 'rm -rf "${repo}"' EXIT
+    git clone --quiet --filter=blob:none --no-checkout "${url}" "${repo}"
+fi
+
+commit="$(git -C "${repo}" rev-parse --verify "${ref}^{commit}")"
+skills=()
+while IFS= read -r path; do
+    skills+=("$(dirname "${path}")")
+done < <(git -C "${repo}" ls-tree -r --name-only "${commit}" | grep -E '^ed-[^/]+/SKILL\.md$')
+if [ "${#skills[@]}" -eq 0 ]; then
+    echo "no ed-* skills at ${ref} (${commit})" >&2
+    exit 1
+fi
+
+rm -rf "${dest}"
+mkdir -p "${dest}"
+git -C "${repo}" archive "${commit}" "${skills[@]}" | tar -x -C "${dest}"
+printf '%s %s\n' "${url}" "${commit}" > "${root}/pkg/skills/SOURCE"
+echo "synced ${#skills[@]} skills from ${url} at ${commit}"

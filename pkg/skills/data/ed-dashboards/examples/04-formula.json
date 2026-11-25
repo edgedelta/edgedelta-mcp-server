@@ -1,0 +1,74 @@
+{
+  "dashboard_name": "Formula Example",
+  "description": "Two queries plus a formula visual that divides one by the other.",
+  "tags": ["generated", "preview"],
+  "definition": {
+    "version": 4,
+    "timeFilters": {
+      "lookback": "6h"
+    },
+    "widgets": [
+      {
+        "id": "root",
+        "type": "grid",
+        "displayOptions": {
+          "hideBackground": true
+        },
+        "grid": "72px 72px 72px 72px / 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
+      },
+      {
+        "id": 1,
+        "type": "viz",
+        "displayOptions": {
+          "title": "Output bytes per input byte"
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 1,
+            "columnSpan": 12,
+            "row": 1,
+            "rowSpan": 4
+          }
+        },
+        "resultType": "timeseries",
+        "visualizer": {
+          "type": "line"
+        },
+        "visuals": [
+          {
+            "id": "A",
+            "hidden": true,
+            "dataSource": {
+              "type": "metric",
+              "params": {
+                "query": "sum:ed.pipeline.node.write_bytes{*}.rollup(60)"
+              }
+            }
+          },
+          {
+            "id": "B",
+            "hidden": true,
+            "dataSource": {
+              "type": "metric",
+              "params": {
+                "query": "sum:ed.pipeline.node.read_bytes{*}.rollup(60)"
+              }
+            }
+          },
+          {
+            "id": "W",
+            "label": "Compression ratio",
+            "dataSource": {
+              "type": "formula",
+              "params": {
+                "formula": "A / B"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

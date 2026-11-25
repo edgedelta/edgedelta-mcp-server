@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/skills"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -25,6 +26,7 @@ var (
 		},
 		apiTokenHeader: "X-ED-API-Token",
 		logger:         slog.Default(),
+		skills:         skills.Embedded,
 		// HTTP server options
 		port:             8080,
 		stateless:        true,
@@ -54,13 +56,37 @@ func CreateServer(serverType ServerType, orgID, apiToken string, opts ...ServerO
 	}
 }
 
-func newMCPServer(c serverConfig) *server.MCPServer {
-	return server.NewMCPServer(c.serverName, c.serverVersion,
+// newMCPServer builds the MCP server with its tools and resources, and the handlers of the extensions it offers.
+func newMCPServer(c serverConfig, client tools.Client) (*server.MCPServer, extensions) {
+	x := extensions{events: c.eventsHandler(client), skills: c.skillsHandler()}
+	s := server.NewMCPServer(c.serverName, c.serverVersion,
 		server.WithTitle(c.serverTitle),
 		server.WithWebsiteURL(c.websiteURL),
 		server.WithIcons(c.icons...),
-		server.WithHooks(eventsHooks()),
+		server.WithHooks(extensionHooks(x.skills != nil)),
 	)
+	AddCustomTools(s, client)
+	AddCustomResources(s, client)
+	if x.skills != nil {
+		addSkillResources(s, x.skills)
+	}
+	return s, x
+}
+
+// skillsHandler serves the configured skills, or none when there are none or they can't be read.
+func (c serverConfig) skillsHandler() *skills.Handler {
+	if c.skills == nil {
+		return nil
+	}
+	catalog, err := c.skills()
+	if err != nil {
+		c.logger.Error("Serving no skills", "error", err)
+		return nil
+	}
+	if catalog == nil || len(catalog.Skills()) == 0 {
+		return nil
+	}
+	return skills.NewHandler(catalog)
 }
 
 func AddCustomTools(s *server.MCPServer, client tools.Client) {
@@ -142,6 +168,7 @@ type serverConfig struct {
 	icons          []mcp.Icon
 	apiTokenHeader string
 	logger         *slog.Logger
+	skills         func() (*skills.Catalog, error)
 
 	// HTTP server options
 	port             int
@@ -185,6 +212,14 @@ func (c serverConfig) eventsHandler(client tools.Client) *events.Handler {
 		opts = append(opts, events.WithStore(c.eventStore, c.eventSender))
 	}
 	return events.NewHandler(client, opts...)
+}
+
+// WithSkills sets the skills the server offers through the MCP Skills extension, in place of the embedded ed-*
+// skills. A nil catalog offers none, and leaves the extension undeclared.
+func WithSkills(catalog *skills.Catalog) ServerOption {
+	return func(c *serverConfig) {
+		c.skills = func() (*skills.Catalog, error) { return catalog, nil }
+	}
 }
 
 // WithServerName sets the server name

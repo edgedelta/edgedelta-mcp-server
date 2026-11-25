@@ -1,0 +1,88 @@
+{
+  "dashboard_name": "Timeseries With Variables Example",
+  "description": "A trend chart filtered by a dropdown variable the viewer picks.",
+  "tags": ["generated", "preview"],
+  "definition": {
+    "version": 4,
+    "timeFilters": {
+      "lookback": "6h"
+    },
+    "variables": [
+      {
+        "id": 1,
+        "key": "fleet",
+        "label": "Fleet",
+        "type": "facet-option",
+        "value": null,
+        "params": {
+          "facet": "ed.tag",
+          "scope": "metric",
+          "allowMultiple": false,
+          "allowEmpty": true,
+          "autoSelect": true
+        }
+      }
+    ],
+    "widgets": [
+      {
+        "id": "root",
+        "type": "grid",
+        "displayOptions": {
+          "hideBackground": true
+        },
+        "grid": "36px 72px 72px 72px 72px / 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
+      },
+      {
+        "id": 1,
+        "type": "variable-control",
+        "displayOptions": {
+          "hideBackground": true
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 1,
+            "columnSpan": 4,
+            "row": 1,
+            "rowSpan": 1
+          }
+        },
+        "variableId": 1
+      },
+      {
+        "id": 2,
+        "type": "viz",
+        "displayOptions": {
+          "title": "CPU by host",
+          "description": "Uses the $fleet variable"
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 1,
+            "columnSpan": 12,
+            "row": 2,
+            "rowSpan": 4
+          }
+        },
+        "resultType": "timeseries",
+        "visualizer": {
+          "type": "line"
+        },
+        "visuals": [
+          {
+            "id": "A",
+            "dataSource": {
+              "type": "metric",
+              "params": {
+                "query": "avg:ed.agent.cpu.milicores{ed.tag:$fleet} by {host.name}.rollup(60)"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

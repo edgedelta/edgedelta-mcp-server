@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
+	"github.com/edgedelta/edgedelta-mcp-server/pkg/skills"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/google/go-cmp/cmp"
@@ -61,7 +62,7 @@ func TestHTTPEvents(t *testing.T) {
 			body:   `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}`,
 			status: http.StatusOK,
 			check:  func(r map[string]any) any { return dig(r, "result", "capabilities", "extensions") },
-			want:   map[string]any{events.Extension: map[string]any{}},
+			want:   map[string]any{events.Extension: map[string]any{}, skills.Extension: map[string]any{"directoryRead": true}},
 		},
 		{
 			desc:   "events/list names the types",
@@ -141,8 +142,8 @@ func TestFilterEvents(t *testing.T) {
 		}
 	}()
 	out := &strings.Builder{}
-	if err := filterEvents(context.Background(), h, strings.NewReader(input), &lineWriter{w: out}, next); err != nil {
-		t.Fatalf("filterEvents: %v", err)
+	if err := filterExtensions(context.Background(), extensions{events: h}, strings.NewReader(input), &lineWriter{w: out}, next); err != nil {
+		t.Fatalf("filterExtensions: %v", err)
 	}
 	<-done
 
