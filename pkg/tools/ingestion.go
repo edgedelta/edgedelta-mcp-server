@@ -18,24 +18,24 @@ const (
 )
 
 type ingestionEndpointOut struct {
-	Protocol    string `json:"protocol" jsonschema:"The protocol to send data with."`
-	DataType    string `json:"data_type" jsonschema:"The kind of telemetry the endpoint takes, such as logs, metrics or traces."`
-	URL         string `json:"url" jsonschema:"The endpoint's URL, with the ingestion token in it."`
-	SampleData  string `json:"sample_data,omitempty" jsonschema:"A sample payload the endpoint accepts."`
-	TestCommand string `json:"test_command,omitempty" jsonschema:"A command that sends the sample payload to the endpoint."`
+	Protocol    string `json:"protocol"`
+	DataType    string `json:"data_type" jsonschema:"Such as logs, metrics or traces."`
+	URL         string `json:"url" jsonschema:"Includes the ingestion token."`
+	SampleData  string `json:"sample_data,omitempty"`
+	TestCommand string `json:"test_command,omitempty" jsonschema:"Sends sample_data to url."`
 }
 
 type ingestionPipelineOut struct {
-	ConfID    string                 `json:"conf_id" jsonschema:"The pipeline's ID."`
-	Name      string                 `json:"name" jsonschema:"The pipeline's name."`
-	NodeName  string                 `json:"node_name" jsonschema:"The pipeline's HTTP ingestion input node that the endpoints send to."`
-	Default   bool                   `json:"default" jsonschema:"Whether this is the org's auto-provisioned telemetry pipeline, to prefer when nothing else decides."`
-	Endpoints []ingestionEndpointOut `json:"endpoints" jsonschema:"The pipeline's ingestion endpoints, one per data type."`
-	Error     string                 `json:"error,omitempty" jsonschema:"Why the pipeline's endpoints couldn't be resolved."`
+	ConfID    string                 `json:"conf_id"`
+	Name      string                 `json:"name"`
+	NodeName  string                 `json:"node_name" jsonschema:"The HTTP ingestion input node the endpoints send to."`
+	Default   bool                   `json:"default" jsonschema:"The org's auto-provisioned pipeline, to prefer when nothing else decides."`
+	Endpoints []ingestionEndpointOut `json:"endpoints" jsonschema:"One per data type."`
+	Error     string                 `json:"error,omitempty" jsonschema:"Why endpoints couldn't be resolved."`
 }
 
 type getIngestionEndpointOut struct {
-	Pipelines []ingestionPipelineOut `json:"pipelines" jsonschema:"Every ingestion pipeline the caller can see."`
+	Pipelines []ingestionPipelineOut `json:"pipelines"`
 }
 
 // GetIngestionEndpointTool returns Edge Delta ingestion URLs for every

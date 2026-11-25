@@ -16,22 +16,22 @@ import (
 )
 
 type SearchResponse struct {
-	Data       json.RawMessage `json:"data" jsonschema:"The Edge Delta API's response, passed through."`
-	TotalCount int             `json:"total_count" jsonschema:"How many results data holds: its items, pattern stats or timeseries records. 0 means nothing matched."`
-	Query      string          `json:"query_used,omitempty" jsonschema:"The CQL query the search ran."`
-	Guidance   *SearchGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these results."`
+	Data       json.RawMessage `json:"data"`
+	TotalCount int             `json:"total_count" jsonschema:"Results in data; 0 means nothing matched."`
+	Query      string          `json:"query_used,omitempty"`
+	Guidance   *SearchGuidance `json:"guidance,omitempty"`
 }
 
 type SearchGuidance struct {
-	ResultStatus string   `json:"result_status" jsonschema:"success when the search found results, empty when it found none."`
-	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"What to do with the results."`
-	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find results when there were none."`
+	ResultStatus string   `json:"result_status" jsonschema:"success or empty."`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
 // GetLogSearchTool creates a tool to search logs
 func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_search",
-			outputSchema[SearchResponse](doc("data", "The logs found: an object with query_id, items (each with id, timestamp, severity_text, body, resource and attributes) and next_cursor, to pass as cursor for the next page.")),
+			outputSchema[SearchResponse](doc("data", "{query_id, items, next_cursor}; items have id, timestamp, severity_text, body, resource and attributes. Pass next_cursor as cursor for the next page.")),
 			mcp.WithTitleAnnotation("Search Logs"),
 			mcp.WithDescription(`Search logs using CQL (Common Query Language).
 
@@ -221,7 +221,7 @@ func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, 
 // GetMetricSearchTool creates a tool to search metrics
 func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_search",
-			outputSchema[SearchResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
+			outputSchema[SearchResponse](doc("data", "{from, to, window, keys, records}, or one such object per formula.")),
 			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Search and aggregate metrics.
 
@@ -418,7 +418,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 // GetEventSearchTool creates a tool to search events
 func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_event_search",
-			outputSchema[SearchResponse](doc("data", "The events found: an object with query_id, items and next_cursor, to pass as cursor for the next page.")),
+			outputSchema[SearchResponse](doc("data", "{query_id, items, next_cursor}. Pass next_cursor as cursor for the next page.")),
 			mcp.WithTitleAnnotation("Search Events"),
 			mcp.WithDescription(`Search events (anomalies, alerts, kubernetes events) using CQL.
 
@@ -553,7 +553,7 @@ Use discover_schema tool or facet_options tool to verify field values.`),
 // GetLogPatternsTool creates a tool to get pattern stats
 func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_patterns",
-			outputSchema[SearchResponse](doc("data", "The patterns found: an object whose stats lists each pattern with its counts, delta and sentiment.")),
+			outputSchema[SearchResponse](doc("data", "{stats}: each pattern with its counts, delta and sentiment.")),
 			mcp.WithTitleAnnotation("Get Log Patterns"),
 			mcp.WithDescription(`Get top log patterns (message signatures) with statistics.
 
@@ -691,7 +691,7 @@ Use discover_schema tool or facet_options tool to verify field values.`),
 // GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
 func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_timeline",
-			outputSchema[SearchResponse](doc("data", "The spans found, as the Edge Delta API returns them.")),
+			outputSchema[SearchResponse](),
 			mcp.WithTitleAnnotation("Get Trace Timeline"),
 			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
 

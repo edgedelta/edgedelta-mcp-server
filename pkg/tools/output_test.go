@@ -202,7 +202,7 @@ func TestOutputSchemaDescribesData(t *testing.T) {
 	if err := json.Unmarshal(tool.RawOutputSchema, &schema); err != nil {
 		t.Fatal(err)
 	}
-	if got := schema.Properties["data"].Description; !strings.Contains(got, "patterns") {
+	if got := schema.Properties["data"].Description; !strings.Contains(got, "stats") {
 		t.Errorf("data description = %q, want get_log_patterns' own", got)
 	}
 	if got := schema.Properties["total_count"].Description; got == "" {

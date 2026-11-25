@@ -14,15 +14,15 @@ import (
 )
 
 type Facet struct {
-	Name    string        `json:"name" jsonschema:"The facet's display name."`
-	Path    string        `json:"path,omitempty" jsonschema:"The field path, as used in CQL and as facet_options' facet_path."`
-	Scope   string        `json:"scope,omitempty" jsonschema:"The scope the facet belongs to: log, metric, trace, pattern or event."`
-	Options []FacetOption `json:"options,omitempty" jsonschema:"The facet's values, when they were asked for."`
+	Name    string        `json:"name"`
+	Path    string        `json:"path,omitempty" jsonschema:"The field path, for CQL and facet_options."`
+	Scope   string        `json:"scope,omitempty" jsonschema:"log, metric, trace, pattern or event."`
+	Options []FacetOption `json:"options,omitempty"`
 }
 
 type FacetOption struct {
-	Name  string `json:"name" jsonschema:"The value, to use in CQL as path:\"value\"."`
-	Count int    `json:"count,omitempty" jsonschema:"How many records have the value."`
+	Name  string `json:"name" jsonschema:"Use in CQL as path:\"value\"."`
+	Count int    `json:"count,omitempty"`
 }
 
 type FacetsResponse struct {
@@ -31,23 +31,23 @@ type FacetsResponse struct {
 }
 
 type FacetsToolResponse struct {
-	Scope    string         `json:"scope" jsonschema:"The scope the facets belong to: log, metric, trace, pattern or event."`
-	Facets   []Facet        `json:"facets" jsonschema:"The scope's facets: the built-in ones, then the user-defined ones."`
-	Guidance *FacetGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these facets."`
+	Scope    string         `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
+	Facets   []Facet        `json:"facets" jsonschema:"Built-in facets first, then user-defined ones."`
+	Guidance *FacetGuidance `json:"guidance,omitempty"`
 }
 
 type FacetGuidance struct {
-	ResultStatus string   `json:"result_status" jsonschema:"success when there were facets or values, empty when there were none."`
-	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
-	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find facets or values when there were none."`
+	ResultStatus string   `json:"result_status" jsonschema:"success or empty."`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
 type FacetOptionsResponse struct {
-	FacetPath   string         `json:"facet_path" jsonschema:"The facet whose values these are."`
-	Scope       string         `json:"scope" jsonschema:"The scope the facet belongs to: log, metric, trace, pattern or event."`
-	TotalValues int            `json:"total_values" jsonschema:"How many values options holds."`
-	Options     []FacetOption  `json:"options" jsonschema:"The facet's values, with how many records have each."`
-	Guidance    *FacetGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these values."`
+	FacetPath   string         `json:"facet_path"`
+	Scope       string         `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
+	TotalValues int            `json:"total_values"`
+	Options     []FacetOption  `json:"options"`
+	Guidance    *FacetGuidance `json:"guidance,omitempty"`
 }
 
 var FacetsTool = mcp.NewTool("facets",

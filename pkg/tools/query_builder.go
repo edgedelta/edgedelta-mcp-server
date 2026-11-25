@@ -12,28 +12,28 @@ import (
 )
 
 type CQLValidationResult struct {
-	Valid           bool                `json:"valid" jsonschema:"Whether the query is valid CQL for the scope."`
-	NormalizedQuery string              `json:"normalized_query,omitempty" jsonschema:"The query, normalized, when it is valid."`
-	Errors          []string            `json:"errors,omitempty" jsonschema:"Why the query is invalid."`
-	Warnings        []string            `json:"warnings,omitempty" jsonschema:"Problems that don't make the query invalid."`
-	Suggestions     []string            `json:"suggestions,omitempty" jsonschema:"How to fix the errors and warnings."`
-	SyntaxReference string              `json:"syntax_reference,omitempty" jsonschema:"Where to read about CQL syntax."`
-	Guidance        *ValidationGuidance `json:"guidance,omitempty" jsonschema:"What to do next with this query."`
+	Valid           bool                `json:"valid"`
+	NormalizedQuery string              `json:"normalized_query,omitempty"`
+	Errors          []string            `json:"errors,omitempty"`
+	Warnings        []string            `json:"warnings,omitempty"`
+	Suggestions     []string            `json:"suggestions,omitempty"`
+	SyntaxReference string              `json:"syntax_reference,omitempty"`
+	Guidance        *ValidationGuidance `json:"guidance,omitempty"`
 }
 
 type CQLBuildResult struct {
-	Valid           bool                `json:"valid" jsonschema:"Whether a valid query could be built from the filters."`
-	Query           string              `json:"query,omitempty" jsonschema:"The CQL query built from the filters."`
-	ValidatedFields []string            `json:"validated_fields,omitempty" jsonschema:"The filter fields known in the scope."`
-	UnknownFields   []string            `json:"unknown_fields,omitempty" jsonschema:"The filter fields not known in the scope. Check them with discover_schema or facets."`
-	Errors          []string            `json:"errors,omitempty" jsonschema:"Why no valid query could be built."`
-	Suggestions     []string            `json:"suggestions,omitempty" jsonschema:"How to fix the errors."`
-	Guidance        *ValidationGuidance `json:"guidance,omitempty" jsonschema:"What to do next with this query."`
+	Valid           bool                `json:"valid"`
+	Query           string              `json:"query,omitempty"`
+	ValidatedFields []string            `json:"validated_fields,omitempty"`
+	UnknownFields   []string            `json:"unknown_fields,omitempty" jsonschema:"Check them with discover_schema or facets."`
+	Errors          []string            `json:"errors,omitempty"`
+	Suggestions     []string            `json:"suggestions,omitempty"`
+	Guidance        *ValidationGuidance `json:"guidance,omitempty"`
 }
 
 type ValidationGuidance struct {
-	ResultStatus string   `json:"result_status" jsonschema:"valid or invalid for validate_cql; success for build_cql."`
-	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
+	ResultStatus string   `json:"result_status" jsonschema:"valid, invalid or success."`
+	NextSteps    []string `json:"next_steps,omitempty"`
 }
 
 var (

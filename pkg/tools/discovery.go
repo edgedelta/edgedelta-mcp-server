@@ -11,20 +11,20 @@ import (
 )
 
 type SchemaDiscovery struct {
-	Scope            string              `json:"scope" jsonschema:"The scope discovered: log, metric, trace, pattern or event."`
-	FacetKeys        []FacetKey          `json:"facet_keys" jsonschema:"Every field path that can be queried in the scope."`
-	CommonFields     map[string][]string `json:"common_fields,omitempty" jsonschema:"Sample values of a few common fields, by field path. Call facet_options for the values of any other field."`
-	CommonFieldsNote string              `json:"common_fields_note,omitempty" jsonschema:"A reminder that common_fields covers only a few fields."`
-	QuerySyntax      QuerySyntaxRef      `json:"query_syntax" jsonschema:"A quick reference for CQL."`
-	AttributeSyntax  map[string]string   `json:"attribute_syntax,omitempty" jsonschema:"How to refer to attributes in CQL, by kind."`
-	SampleQueries    []string            `json:"sample_queries" jsonschema:"Example CQL queries for the scope."`
-	Guidance         *DiscoveryGuidance  `json:"guidance,omitempty" jsonschema:"What to do next with this schema."`
+	Scope            string              `json:"scope" jsonschema:"log, metric, trace, pattern or event."`
+	FacetKeys        []FacetKey          `json:"facet_keys" jsonschema:"The fields that can be queried."`
+	CommonFields     map[string][]string `json:"common_fields,omitempty" jsonschema:"Sample values of a few fields, by field path. Call facet_options for any other field."`
+	CommonFieldsNote string              `json:"common_fields_note,omitempty"`
+	QuerySyntax      QuerySyntaxRef      `json:"query_syntax"`
+	AttributeSyntax  map[string]string   `json:"attribute_syntax,omitempty"`
+	SampleQueries    []string            `json:"sample_queries"`
+	Guidance         *DiscoveryGuidance  `json:"guidance,omitempty"`
 }
 
 type DiscoveryGuidance struct {
-	ResultStatus string   `json:"result_status" jsonschema:"success; partial when the field paths couldn't be fetched; empty when no metric matched."`
-	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
-	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find metrics when none matched."`
+	ResultStatus string   `json:"result_status" jsonschema:"success, partial or empty."`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
 // for quick reference for CQL syntax
@@ -40,17 +40,17 @@ type QuerySyntaxRef struct {
 }
 
 type MetricSearchResult struct {
-	Pattern    string             `json:"pattern" jsonschema:"The pattern searched for."`
-	Matches    []MetricMatch      `json:"matches" jsonschema:"The metrics whose names match, best match first."`
-	TotalFound int                `json:"total_found" jsonschema:"How many metrics matched."`
-	Usage      string             `json:"usage" jsonschema:"How to use a match."`
-	Guidance   *DiscoveryGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these matches."`
+	Pattern    string             `json:"pattern"`
+	Matches    []MetricMatch      `json:"matches" jsonschema:"Best match first."`
+	TotalFound int                `json:"total_found"`
+	Usage      string             `json:"usage"`
+	Guidance   *DiscoveryGuidance `json:"guidance,omitempty"`
 }
 
 type MetricMatch struct {
-	Name  string  `json:"name" jsonschema:"The exact metric name, for get_metric_search and get_metric_graph."`
-	Count int     `json:"count,omitempty" jsonschema:"How many records the metric has."`
-	Score float64 `json:"score,omitempty" jsonschema:"How well the name matches the pattern; higher is better."`
+	Name  string  `json:"name" jsonschema:"The exact name get_metric_search and get_metric_graph take."`
+	Count int     `json:"count,omitempty"`
+	Score float64 `json:"score,omitempty" jsonschema:"Higher is a closer match."`
 }
 
 var defaultQuerySyntax = QuerySyntaxRef{

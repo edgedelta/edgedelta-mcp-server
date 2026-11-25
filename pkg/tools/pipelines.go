@@ -17,20 +17,20 @@ import (
 )
 
 type PipelineToolResponse struct {
-	Data     json.RawMessage   `json:"data" jsonschema:"The Edge Delta API's response, passed through."`
-	Guidance *PipelineGuidance `json:"guidance,omitempty" jsonschema:"What to do next."`
+	Data     json.RawMessage   `json:"data"`
+	Guidance *PipelineGuidance `json:"guidance,omitempty"`
 }
 
 // pipelinesOutput is the shape of get_pipelines' PipelineToolResponse, whose data is the pipelines.
 type pipelinesOutput struct {
-	Data     []PipelineSummary `json:"data" jsonschema:"The pipelines found."`
-	Guidance *PipelineGuidance `json:"guidance,omitempty" jsonschema:"What to do next."`
+	Data     []PipelineSummary `json:"data"`
+	Guidance *PipelineGuidance `json:"guidance,omitempty"`
 }
 
 type PipelineGuidance struct {
-	ResultStatus string   `json:"result_status" jsonschema:"success, or invalid when validate_pipeline_config rejected the config."`
-	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
-	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Other things worth trying."`
+	ResultStatus string   `json:"result_status" jsonschema:"success or invalid."`
+	NextSteps    []string `json:"next_steps,omitempty"`
+	Suggestions  []string `json:"suggestions,omitempty"`
 }
 
 func WithKeyword(keyword string) QueryParamOption {
@@ -149,7 +149,7 @@ Returns recently updated pipelines with their conf_id (configuration ID) which i
 // GetPipelineConfigTool creates a tool to retrieve a specific pipeline.
 func GetPipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_config",
-			outputSchema[PipelineToolResponse](doc("data", "The pipeline's conf, with its YAML config in content.")),
+			outputSchema[PipelineToolResponse](doc("data", "The pipeline's conf; its YAML is in content.")),
 			mcp.WithTitleAnnotation("Get Pipeline Config"),
 			mcp.WithDescription(`Get detailed configuration for a specific pipeline.
 
@@ -233,7 +233,7 @@ After viewing config, you can:
 // GetPipelineHistoryTool creates a tool to get pipeline configuration history
 func GetPipelineHistoryTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_history",
-			outputSchema[PipelineToolResponse](doc("data", "The pipeline's saved versions. deploy_pipeline and revert_pipeline take a version from them.")),
+			outputSchema[PipelineToolResponse](doc("data", "The saved versions; deploy_pipeline and revert_pipeline take a version.")),
 			mcp.WithTitleAnnotation("Get Pipeline History"),
 			mcp.WithDescription(`Get version history for a pipeline configuration.
 
@@ -314,7 +314,7 @@ Workflow for deployment:
 // DeployPipelineTool creates a tool to deploy a pipeline configuration
 func DeployPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("deploy_pipeline",
-			outputSchema[PipelineToolResponse](doc("data", "The Edge Delta API's response to the deploy.")),
+			outputSchema[PipelineToolResponse](),
 			mcp.WithTitleAnnotation("Deploy Pipeline"),
 			mcp.WithDescription(`Deploys a specific version of a pipeline configuration.
 
@@ -460,7 +460,7 @@ Example node configurations:
 }`
 
 	return mcp.NewTool("add_pipeline_source",
-			outputSchema[PipelineToolResponse](doc("data", "The Edge Delta API's response to adding the source.")),
+			outputSchema[PipelineToolResponse](),
 			mcp.WithTitleAnnotation("Add Pipeline Source"),
 			mcp.WithDescription(description),
 			mcp.WithString("conf_id",
@@ -557,7 +557,7 @@ Example node configurations:
 // ValidatePipelineConfigTool validates an agent config YAML without saving it.
 func ValidatePipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("validate_pipeline_config",
-			outputSchema[PipelineToolResponse](doc("data", "The validation: valid says whether the config is valid, and reason says why not.")),
+			outputSchema[PipelineToolResponse](doc("data", "{valid, reason}: reason says why the config is invalid.")),
 			mcp.WithTitleAnnotation("Validate Pipeline Config"),
 			mcp.WithDescription(`Validate an Edge Delta pipeline configuration (YAML) WITHOUT saving or deploying it.
 
@@ -620,7 +620,7 @@ Typical workflow:
 // SavePipelineConfigTool saves a new pipeline version from full YAML content (does not deploy).
 func SavePipelineConfigTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("save_pipeline_config",
-			outputSchema[PipelineToolResponse](doc("data", "The saved version, as the Edge Delta API returns it.")),
+			outputSchema[PipelineToolResponse](),
 			mcp.WithTitleAnnotation("Save Pipeline Config"),
 			mcp.WithDescription(`Save a NEW version of a pipeline configuration from full YAML content.
 
@@ -699,7 +699,7 @@ Workflow:
 // RevertPipelineTool rolls a pipeline back to a previously saved version.
 func RevertPipelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("revert_pipeline",
-			outputSchema[PipelineToolResponse](doc("data", "The Edge Delta API's response to the revert.")),
+			outputSchema[PipelineToolResponse](),
 			mcp.WithTitleAnnotation("Revert Pipeline"),
 			mcp.WithDescription(`Revert a pipeline to a previously saved version.
 

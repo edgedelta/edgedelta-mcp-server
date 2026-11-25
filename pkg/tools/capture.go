@@ -76,7 +76,7 @@ func clampFloat(v, min, max float64) float64 {
 // StartPipelineCaptureTool creates a tool that starts a live-capture task on a pipeline.
 func StartPipelineCaptureTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("start_pipeline_capture",
-			outputSchema[PipelineToolResponse](doc("data", "The capture task. Its id is get_pipeline_capture_status's task_id.")),
+			outputSchema[PipelineToolResponse](doc("data", "The capture task; its id is get_pipeline_capture_status' task_id.")),
 			mcp.WithTitleAnnotation("Start Pipeline Capture"),
 			mcp.WithDescription(`Start a live-capture task on a pipeline to sample real before/after data flowing through its nodes.
 
@@ -203,7 +203,7 @@ Workflow:
 // GetPipelineCaptureStatusTool creates a tool that checks the status of a live-capture task.
 func GetPipelineCaptureStatusTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_status",
-			outputSchema[PipelineToolResponse](doc("data", "The capture task's status, with each agent's in capture_status.")),
+			outputSchema[PipelineToolResponse](doc("data", "Each agent's status, in capture_status.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Status"),
 			mcp.WithDescription(`Check the status of a pipeline live-capture task.
 
@@ -259,7 +259,7 @@ get_pipeline_capture_results to fetch the captured before/after samples.`),
 // GetPipelineCaptureResultsTool creates a tool that fetches captured before/after samples for a pipeline.
 func GetPipelineCaptureResultsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_results",
-			outputSchema[PipelineToolResponse](doc("data", "Each captured node's samples from before and after it.")),
+			outputSchema[PipelineToolResponse](doc("data", "Each node's samples from before and after it.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Results"),
 			mcp.WithDescription(`Fetch captured live-capture results for a pipeline.
 
@@ -319,7 +319,7 @@ happened (e.g. a field present in "after" but not in "before").`),
 // GetPipelineCaptureTaskTool creates a tool that fetches the active live-capture task for a pipeline, if any.
 func GetPipelineCaptureTaskTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pipeline_capture_task",
-			outputSchema[PipelineToolResponse](doc("data", "The pipeline's capture task, with its id when one is active.")),
+			outputSchema[PipelineToolResponse](doc("data", "The active capture task, if any.")),
 			mcp.WithTitleAnnotation("Get Pipeline Capture Task"),
 			mcp.WithDescription(`Get the currently active live-capture task for a pipeline, if any.
 

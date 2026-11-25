@@ -59,15 +59,15 @@ const (
 
 // PipelineSummary represents a pipeline summary
 type PipelineSummary struct {
-	ID          string          `json:"id" jsonschema:"The pipeline's ID, the conf_id of the pipeline tools."`
+	ID          string          `json:"id" jsonschema:"The conf_id the pipeline tools take."`
 	Tag         string          `json:"tag" jsonschema:"The pipeline's name."`
-	ClusterName string          `json:"cluster_name,omitempty" jsonschema:"The cluster the pipeline runs in."`
-	Creator     string          `json:"creator" jsonschema:"Who created the pipeline."`
-	Created     string          `json:"created" jsonschema:"When the pipeline was created."`
-	Updater     string          `json:"updater,omitempty" jsonschema:"Who last updated the pipeline."`
-	Updated     string          `json:"updated,omitempty" jsonschema:"When the pipeline was last updated."`
-	Environment EnvironmentType `json:"environment,omitempty" jsonschema:"Where the pipeline's agents run: Kubernetes, Helm, Docker, MacOS, Linux or Windows."`
-	FleetType   FleetType       `json:"fleet_type,omitempty" jsonschema:"The kind of fleet the pipeline runs: Edge, Cloud, Gateway or IngestionPipeline."`
+	ClusterName string          `json:"cluster_name,omitempty"`
+	Creator     string          `json:"creator"`
+	Created     string          `json:"created"`
+	Updater     string          `json:"updater,omitempty"`
+	Updated     string          `json:"updated,omitempty"`
+	Environment EnvironmentType `json:"environment,omitempty" jsonschema:"Kubernetes, Helm, Docker, MacOS, Linux or Windows."`
+	FleetType   FleetType       `json:"fleet_type,omitempty" jsonschema:"Edge, Cloud, Gateway or IngestionPipeline."`
 	Status      FleetStatus     `json:"status,omitempty" jsonschema:"running or suspended."`
 }
 

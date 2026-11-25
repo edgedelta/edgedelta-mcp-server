@@ -67,7 +67,7 @@ func stringArrayParam(request mcp.CallToolRequest, name string) ([]string, error
 // TestPipelineOTTLTool creates a tool that dry-runs OTTL statements against sample OTEL logs.
 func TestPipelineOTTLTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("test_pipeline_ottl",
-			outputSchema[PipelineToolResponse](doc("data", "The input items after the OTTL statements ran on them.")),
+			outputSchema[PipelineToolResponse](doc("data", "The items after the statements ran.")),
 			mcp.WithTitleAnnotation("Test Pipeline OTTL"),
 			mcp.WithDescription(`Dry-run OTTL (OpenTelemetry Transformation Language) statements against sample OTEL log
 items WITHOUT saving or deploying any pipeline configuration. This is the offline complement
