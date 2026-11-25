@@ -52,10 +52,7 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 
 	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
-	s := newMCPServer(config)
-
-	AddCustomTools(s, httpClient)
-	AddCustomResources(s, httpClient)
+	s, x := newMCPServer(config, httpClient)
 
 	// Create auth middleware that uses the configured header
 	authMiddleware := func(ctx context.Context, r *http.Request) context.Context {
@@ -94,7 +91,7 @@ func NewHTTPServer(opts ...ServerOption) (*MCPHTTPServer, error) {
 
 	return &MCPHTTPServer{
 		httpServer: httpServer,
-		handler:    eventsHTTPHandler(config.eventsHandler(httpClient), authMiddleware, httpServer),
+		handler:    extensionsHTTPHandler(x, authMiddleware, httpServer),
 		config:     &config,
 	}, nil
 }
@@ -117,12 +114,13 @@ func addToContext(ctx context.Context, key tools.ContextKey, value string) conte
 	return context.WithValue(ctx, key, value)
 }
 
-// HTTPServer returns mcp-go's server, which answers no events/* requests; serve Handler instead.
+// HTTPServer returns mcp-go's server, which answers no requests of the Events or Skills extensions; serve Handler
+// instead.
 func (m *MCPHTTPServer) HTTPServer() *server.StreamableHTTPServer {
 	return m.httpServer
 }
 
-// Handler serves MCP over Streamable HTTP, the Events extension's requests included.
+// Handler serves MCP over Streamable HTTP, the requests of the Events and Skills extensions included.
 func (m *MCPHTTPServer) Handler() http.Handler {
 	return m.handler
 }

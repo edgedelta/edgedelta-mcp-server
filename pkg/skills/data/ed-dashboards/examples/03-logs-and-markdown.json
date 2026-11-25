@@ -1,0 +1,105 @@
+{
+  "dashboard_name": "Logs And Markdown Example",
+  "description": "Mixes data types: a log count, a log breakdown table, and a text panel.",
+  "tags": ["generated", "preview"],
+  "definition": {
+    "version": 4,
+    "timeFilters": {
+      "lookback": "24h"
+    },
+    "widgets": [
+      {
+        "id": "root",
+        "type": "grid",
+        "displayOptions": {
+          "hideBackground": true
+        },
+        "grid": "72px 72px 72px 72px 72px 72px / 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr"
+      },
+      {
+        "id": 1,
+        "type": "markdown",
+        "displayOptions": {
+          "hideBackground": false
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 1,
+            "columnSpan": 4,
+            "row": 1,
+            "rowSpan": 3
+          }
+        },
+        "params": {
+          "content": "## Error overview\n\nCounts come from log search, not metrics."
+        }
+      },
+      {
+        "id": 2,
+        "type": "viz",
+        "displayOptions": {
+          "title": "Errors (24h)"
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 5,
+            "columnSpan": 4,
+            "row": 1,
+            "rowSpan": 3
+          }
+        },
+        "resultType": "aggregate",
+        "visualizer": {
+          "type": "bignumber"
+        },
+        "visuals": [
+          {
+            "id": "A",
+            "dataSource": {
+              "type": "log",
+              "params": {
+                "query": "{severity_text:error}"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "type": "viz",
+        "displayOptions": {
+          "title": "Errors by service"
+        },
+        "position": {
+          "type": "grid",
+          "targetId": "root",
+          "area": {
+            "column": 1,
+            "columnSpan": 12,
+            "row": 4,
+            "rowSpan": 3
+          }
+        },
+        "resultType": "aggregate",
+        "visualizer": {
+          "type": "table"
+        },
+        "visuals": [
+          {
+            "id": "A",
+            "dataSource": {
+              "type": "log",
+              "params": {
+                "query": "{severity_text:error} by {service.name}"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

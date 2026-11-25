@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/edgedelta/edgedelta-mcp-server/pkg/events"
 	"github.com/edgedelta/edgedelta-mcp-server/pkg/tools"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -18,7 +17,7 @@ import (
 type MCPServer struct {
 	server      *server.MCPServer
 	stdioServer *server.StdioServer
-	events      *events.Handler
+	extensions  extensions
 	orgID       string
 	apiToken    string
 	config      *serverConfig
@@ -43,17 +42,14 @@ func NewStdioServer(orgID, apiToken string, opts ...ServerOption) (*MCPServer, e
 
 	httpClient := tools.NewHTTPClient(config.apiURL, config.apiTokenHeader)
 
-	s := newMCPServer(config)
-
-	AddCustomTools(s, httpClient)
-	AddCustomResources(s, httpClient)
+	s, x := newMCPServer(config, httpClient)
 
 	m := &MCPServer{
-		server:   s,
-		events:   config.eventsHandler(httpClient),
-		orgID:    orgID,
-		apiToken: apiToken,
-		config:   &config,
+		server:     s,
+		extensions: x,
+		orgID:      orgID,
+		apiToken:   apiToken,
+		config:     &config,
 	}
 	m.stdioServer = server.NewStdioServer(s)
 	m.stdioServer.SetContextFunc(m.withAuth)
@@ -74,7 +70,7 @@ func (m *MCPServer) Start(ctx context.Context) error {
 	in, next := io.Pipe()
 	out := &lineWriter{w: os.Stdout}
 	go func() {
-		if err := filterEvents(m.withAuth(ctx), m.events, os.Stdin, out, next); err != nil {
+		if err := filterExtensions(m.withAuth(ctx), m.extensions, os.Stdin, out, next); err != nil {
 			errC <- err
 		}
 	}()
