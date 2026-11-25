@@ -11,20 +11,20 @@ import (
 )
 
 type SchemaDiscovery struct {
-	Scope            string              `json:"scope"`
-	FacetKeys        []FacetKey          `json:"facet_keys"`
-	CommonFields     map[string][]string `json:"common_fields,omitempty"`
-	CommonFieldsNote string              `json:"common_fields_note,omitempty"`
-	QuerySyntax      QuerySyntaxRef      `json:"query_syntax"`
-	AttributeSyntax  map[string]string   `json:"attribute_syntax,omitempty"`
-	SampleQueries    []string            `json:"sample_queries"`
-	Guidance         *DiscoveryGuidance  `json:"guidance,omitempty"`
+	Scope            string              `json:"scope" jsonschema:"The scope discovered: log, metric, trace, pattern or event."`
+	FacetKeys        []FacetKey          `json:"facet_keys" jsonschema:"Every field path that can be queried in the scope."`
+	CommonFields     map[string][]string `json:"common_fields,omitempty" jsonschema:"Sample values of a few common fields, by field path. Call facet_options for the values of any other field."`
+	CommonFieldsNote string              `json:"common_fields_note,omitempty" jsonschema:"A reminder that common_fields covers only a few fields."`
+	QuerySyntax      QuerySyntaxRef      `json:"query_syntax" jsonschema:"A quick reference for CQL."`
+	AttributeSyntax  map[string]string   `json:"attribute_syntax,omitempty" jsonschema:"How to refer to attributes in CQL, by kind."`
+	SampleQueries    []string            `json:"sample_queries" jsonschema:"Example CQL queries for the scope."`
+	Guidance         *DiscoveryGuidance  `json:"guidance,omitempty" jsonschema:"What to do next with this schema."`
 }
 
 type DiscoveryGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
-	Suggestions  []string `json:"suggestions,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"success; partial when the field paths couldn't be fetched; empty when no metric matched."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
+	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find metrics when none matched."`
 }
 
 // for quick reference for CQL syntax
@@ -40,17 +40,17 @@ type QuerySyntaxRef struct {
 }
 
 type MetricSearchResult struct {
-	Pattern    string             `json:"pattern"`
-	Matches    []MetricMatch      `json:"matches"`
-	TotalFound int                `json:"total_found"`
-	Usage      string             `json:"usage"`
-	Guidance   *DiscoveryGuidance `json:"guidance,omitempty"`
+	Pattern    string             `json:"pattern" jsonschema:"The pattern searched for."`
+	Matches    []MetricMatch      `json:"matches" jsonschema:"The metrics whose names match, best match first."`
+	TotalFound int                `json:"total_found" jsonschema:"How many metrics matched."`
+	Usage      string             `json:"usage" jsonschema:"How to use a match."`
+	Guidance   *DiscoveryGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these matches."`
 }
 
 type MetricMatch struct {
-	Name  string  `json:"name"`
-	Count int     `json:"count,omitempty"`
-	Score float64 `json:"score,omitempty"`
+	Name  string  `json:"name" jsonschema:"The exact metric name, for get_metric_search and get_metric_graph."`
+	Count int     `json:"count,omitempty" jsonschema:"How many records the metric has."`
+	Score float64 `json:"score,omitempty" jsonschema:"How well the name matches the pattern; higher is better."`
 }
 
 var defaultQuerySyntax = QuerySyntaxRef{
@@ -124,6 +124,7 @@ var sampleQueriesByScope = map[string][]string{
 // GetDiscoverSchemaTool creates a tool to discover available schema for building queries
 func GetDiscoverSchemaTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("discover_schema",
+			outputSchema[SchemaDiscovery](),
 			mcp.WithTitleAnnotation("Discover Schema"),
 			mcp.WithDescription(`Discovers available data schema for building queries.
 
@@ -234,13 +235,14 @@ After calling this tool, use build_cql tool to construct queries from structured
 			}
 
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetSearchMetricsTool creates a tool for fuzzy metric name search
 func GetSearchMetricsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("search_metrics",
+			outputSchema[MetricSearchResult](),
 			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Searches for metric names using fuzzy/partial matching.
 
@@ -322,7 +324,7 @@ Use the exact metric name from results in get_metric_search tool or get_metric_g
 			}
 
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 

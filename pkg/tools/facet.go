@@ -14,15 +14,15 @@ import (
 )
 
 type Facet struct {
-	Name    string        `json:"name"`
-	Path    string        `json:"path,omitempty"`
-	Scope   string        `json:"scope,omitempty"`
-	Options []FacetOption `json:"options,omitempty"`
+	Name    string        `json:"name" jsonschema:"The facet's display name."`
+	Path    string        `json:"path,omitempty" jsonschema:"The field path, as used in CQL and as facet_options' facet_path."`
+	Scope   string        `json:"scope,omitempty" jsonschema:"The scope the facet belongs to: log, metric, trace, pattern or event."`
+	Options []FacetOption `json:"options,omitempty" jsonschema:"The facet's values, when they were asked for."`
 }
 
 type FacetOption struct {
-	Name  string `json:"name"`
-	Count int    `json:"count,omitempty"`
+	Name  string `json:"name" jsonschema:"The value, to use in CQL as path:\"value\"."`
+	Count int    `json:"count,omitempty" jsonschema:"How many records have the value."`
 }
 
 type FacetsResponse struct {
@@ -31,26 +31,27 @@ type FacetsResponse struct {
 }
 
 type FacetsToolResponse struct {
-	Scope    string         `json:"scope"`
-	Facets   []Facet        `json:"facets"`
-	Guidance *FacetGuidance `json:"guidance,omitempty"`
+	Scope    string         `json:"scope" jsonschema:"The scope the facets belong to: log, metric, trace, pattern or event."`
+	Facets   []Facet        `json:"facets" jsonschema:"The scope's facets: the built-in ones, then the user-defined ones."`
+	Guidance *FacetGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these facets."`
 }
 
 type FacetGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
-	Suggestions  []string `json:"suggestions,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"success when there were facets or values, empty when there were none."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
+	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find facets or values when there were none."`
 }
 
 type FacetOptionsResponse struct {
-	FacetPath   string         `json:"facet_path"`
-	Scope       string         `json:"scope"`
-	TotalValues int            `json:"total_values"`
-	Options     []FacetOption  `json:"options"`
-	Guidance    *FacetGuidance `json:"guidance,omitempty"`
+	FacetPath   string         `json:"facet_path" jsonschema:"The facet whose values these are."`
+	Scope       string         `json:"scope" jsonschema:"The scope the facet belongs to: log, metric, trace, pattern or event."`
+	TotalValues int            `json:"total_values" jsonschema:"How many values options holds."`
+	Options     []FacetOption  `json:"options" jsonschema:"The facet's values, with how many records have each."`
+	Guidance    *FacetGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these values."`
 }
 
 var FacetsTool = mcp.NewTool("facets",
+	outputSchema[FacetsToolResponse](),
 	mcp.WithTitleAnnotation("Get Facets"),
 	mcp.WithDescription(`Retrieves all available field names (facets) for filtering in the given scope.
 
@@ -79,6 +80,7 @@ var FacetsResource = mcp.NewResourceTemplate(
 )
 
 var FacetOptionsTool = mcp.NewTool("facet_options",
+	outputSchema[FacetOptionsResponse](),
 	mcp.WithTitleAnnotation("Get Facet Options"),
 	mcp.WithDescription(`Retrieves all available values for a specific field (facet) in the given scope.
 
@@ -159,7 +161,7 @@ func FacetsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}
 
-		return mcp.NewToolResultText(string(r)), nil
+		return structuredResult(r), nil
 	}
 }
 
@@ -252,7 +254,7 @@ func FacetOptionsToolHandler(client Client) server.ToolHandlerFunc {
 			return nil, fmt.Errorf("failed to marshal response, err: %w", err)
 		}
 
-		return mcp.NewToolResultText(string(r)), nil
+		return structuredResult(r), nil
 	}
 }
 

@@ -16,15 +16,15 @@ import (
 )
 
 type GraphToolResponse struct {
-	Data     json.RawMessage `json:"data"`
-	Query    string          `json:"query_used,omitempty"`
-	Guidance *GraphGuidance  `json:"guidance,omitempty"`
+	Data     json.RawMessage `json:"data" jsonschema:"The Edge Delta API's graph response, passed through."`
+	Query    string          `json:"query_used,omitempty" jsonschema:"The query the graph ran."`
+	Guidance *GraphGuidance  `json:"guidance,omitempty" jsonschema:"What to do next with this graph."`
 }
 
 type GraphGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
-	Suggestions  []string `json:"suggestions,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"success when the graph has data, empty when it has none."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"What to do with the graph."`
+	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find data when there was none."`
 }
 
 func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, error) {
@@ -51,7 +51,7 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 	}
 
 	response := GraphToolResponse{
-		Data:  bodyBytes,
+		Data:  rawJSON(bodyBytes),
 		Query: query,
 	}
 
@@ -80,12 +80,13 @@ func formatGraphResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, e
 	}
 
 	result, _ := json.Marshal(response)
-	return mcp.NewToolResultText(string(result)), nil
+	return structuredResult(result), nil
 }
 
 // GetLogGraphTool creates a tool to render a graph from logs
 func GetLogGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_graph",
+			outputSchema[GraphToolResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
 			mcp.WithTitleAnnotation("Get Log Graph"),
 			mcp.WithDescription(`Render a time series graph of log counts.
 
@@ -226,6 +227,7 @@ Use "*" for all logs. Verify fields with discover_schema tool first.`),
 // GetMetricGraphTool creates a tool to render a graph from metrics
 func GetMetricGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_graph",
+			outputSchema[GraphToolResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
 			mcp.WithTitleAnnotation("Get Metric Graph"),
 			mcp.WithDescription(`Render a time series graph for a metric.
 
@@ -414,6 +416,7 @@ Use "*" for no filter. Verify field values with facet_options.`),
 // GetTraceGraphTool creates a tool to render a graph from traces
 func GetTraceGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_graph",
+			outputSchema[GraphToolResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
 			mcp.WithTitleAnnotation("Get Trace Graph"),
 			mcp.WithDescription(`Render a time series graph from traces.
 
@@ -577,6 +580,7 @@ NOTE: Full-text search is NOT supported for traces.`),
 // GetPatternGraphTool creates a tool to render a graph from patterns
 func GetPatternGraphTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_pattern_graph",
+			outputSchema[GraphToolResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
 			mcp.WithTitleAnnotation("Get Pattern Graph"),
 			mcp.WithDescription(`Render a time series graph of log pattern counts.
 

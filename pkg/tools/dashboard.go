@@ -14,19 +14,20 @@ import (
 )
 
 type DashboardToolResponse struct {
-	Data     json.RawMessage    `json:"data"`
-	Guidance *DashboardGuidance `json:"guidance,omitempty"`
+	Data     json.RawMessage    `json:"data" jsonschema:"The Edge Delta API's response, passed through."`
+	Guidance *DashboardGuidance `json:"guidance,omitempty" jsonschema:"What to do next."`
 }
 
 type DashboardGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
-	Suggestions  []string `json:"suggestions,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"success when the call worked."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
+	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Other things worth trying."`
 }
 
 // GetAllDashboardsTool creates a tool to get all dashboards
 func GetAllDashboardsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_all_dashboards",
+			outputSchema[DashboardToolResponse](doc("data", "The org's dashboards.")),
 			mcp.WithTitleAnnotation("Get All Dashboards"),
 			mcp.WithDescription(`List all dashboards in the organization.
 
@@ -85,7 +86,7 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 
 			// Wrap with guidance
 			response := DashboardToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &DashboardGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -100,13 +101,14 @@ Returns dashboard summaries. Use include_definitions:true for full widget defini
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
 
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetDashboardTool creates a tool to get a specific dashboard
 func GetDashboardTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_dashboard",
+			outputSchema[DashboardToolResponse](doc("data", "The dashboard, with its definition.")),
 			mcp.WithTitleAnnotation("Get Dashboard"),
 			mcp.WithDescription(`Get detailed configuration for a specific dashboard.
 
@@ -159,7 +161,7 @@ Returns full dashboard configuration including widget definitions and layout.`),
 
 			// Wrap with guidance
 			response := DashboardToolResponse{
-				Data: bodyBytes,
+				Data: rawJSON(bodyBytes),
 				Guidance: &DashboardGuidance{
 					ResultStatus: "success",
 					NextSteps: []string{
@@ -174,6 +176,6 @@ Returns full dashboard configuration including widget definitions and layout.`),
 				return nil, fmt.Errorf("failed to marshal wrapped response, err: %w", err)
 			}
 
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }

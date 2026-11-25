@@ -16,21 +16,22 @@ import (
 )
 
 type SearchResponse struct {
-	Data       json.RawMessage `json:"data"`
-	TotalCount int             `json:"total_count"`
-	Query      string          `json:"query_used,omitempty"`
-	Guidance   *SearchGuidance `json:"guidance,omitempty"`
+	Data       json.RawMessage `json:"data" jsonschema:"The Edge Delta API's response, passed through."`
+	TotalCount int             `json:"total_count" jsonschema:"How many results data holds: its items, pattern stats or timeseries records. 0 means nothing matched."`
+	Query      string          `json:"query_used,omitempty" jsonschema:"The CQL query the search ran."`
+	Guidance   *SearchGuidance `json:"guidance,omitempty" jsonschema:"What to do next with these results."`
 }
 
 type SearchGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
-	Suggestions  []string `json:"suggestions,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"success when the search found results, empty when it found none."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"What to do with the results."`
+	Suggestions  []string `json:"suggestions,omitempty" jsonschema:"Ways to find results when there were none."`
 }
 
 // GetLogSearchTool creates a tool to search logs
 func GetLogSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_search",
+			outputSchema[SearchResponse](doc("data", "The logs found: an object with query_id, items (each with id, timestamp, severity_text, body, resource and attributes) and next_cursor, to pass as cursor for the next page.")),
 			mcp.WithTitleAnnotation("Search Logs"),
 			mcp.WithDescription(`Search logs using CQL (Common Query Language).
 
@@ -159,10 +160,9 @@ Use discover_schema tool or facet_options tool first to verify field names.`),
 }
 
 func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, error) {
+	// A body that isn't a JSON object counts no results, and is passed through as data.
 	var genericResp map[string]any
-	if err := json.Unmarshal(bodyBytes, &genericResp); err != nil {
-		return mcp.NewToolResultText(string(bodyBytes)), nil
-	}
+	_ = json.Unmarshal(bodyBytes, &genericResp)
 
 	totalCount := 0
 	if items, ok := genericResp["items"].([]any); ok {
@@ -186,7 +186,7 @@ func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, 
 	}
 
 	response := SearchResponse{
-		Data:       bodyBytes,
+		Data:       rawJSON(bodyBytes),
 		TotalCount: totalCount,
 		Query:      query,
 	}
@@ -215,12 +215,13 @@ func formatSearchResponse(bodyBytes []byte, query string) (*mcp.CallToolResult, 
 	}
 
 	result, _ := json.Marshal(response)
-	return mcp.NewToolResultText(string(result)), nil
+	return structuredResult(result), nil
 }
 
 // GetMetricSearchTool creates a tool to search metrics
 func GetMetricSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_metric_search",
+			outputSchema[SearchResponse](doc("data", "The timeseries: an object with from, to, window, keys and records, or one such object per formula name when the query uses formulas.")),
 			mcp.WithTitleAnnotation("Search Metrics"),
 			mcp.WithDescription(`Search and aggregate metrics.
 
@@ -417,6 +418,7 @@ Use "*" for no filter (default). Always verify field values with facet_options f
 // GetEventSearchTool creates a tool to search events
 func GetEventSearchTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_event_search",
+			outputSchema[SearchResponse](doc("data", "The events found: an object with query_id, items and next_cursor, to pass as cursor for the next page.")),
 			mcp.WithTitleAnnotation("Search Events"),
 			mcp.WithDescription(`Search events (anomalies, alerts, kubernetes events) using CQL.
 
@@ -551,6 +553,7 @@ Use discover_schema tool or facet_options tool to verify field values.`),
 // GetLogPatternsTool creates a tool to get pattern stats
 func GetLogPatternsTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_log_patterns",
+			outputSchema[SearchResponse](doc("data", "The patterns found: an object whose stats lists each pattern with its counts, delta and sentiment.")),
 			mcp.WithTitleAnnotation("Get Log Patterns"),
 			mcp.WithDescription(`Get top log patterns (message signatures) with statistics.
 
@@ -688,6 +691,7 @@ Use discover_schema tool or facet_options tool to verify field values.`),
 // GetTraceTimelineTool creates a tool to fetch spans suitable for the TraceTimeline component
 func GetTraceTimelineTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_trace_timeline",
+			outputSchema[SearchResponse](doc("data", "The spans found, as the Edge Delta API returns them.")),
 			mcp.WithTitleAnnotation("Get Trace Timeline"),
 			mcp.WithDescription(`Fetch spans (OTel) for a timeline view.
 

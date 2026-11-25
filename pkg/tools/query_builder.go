@@ -12,28 +12,28 @@ import (
 )
 
 type CQLValidationResult struct {
-	Valid           bool                `json:"valid"`
-	NormalizedQuery string              `json:"normalized_query,omitempty"`
-	Errors          []string            `json:"errors,omitempty"`
-	Warnings        []string            `json:"warnings,omitempty"`
-	Suggestions     []string            `json:"suggestions,omitempty"`
-	SyntaxReference string              `json:"syntax_reference,omitempty"`
-	Guidance        *ValidationGuidance `json:"guidance,omitempty"`
+	Valid           bool                `json:"valid" jsonschema:"Whether the query is valid CQL for the scope."`
+	NormalizedQuery string              `json:"normalized_query,omitempty" jsonschema:"The query, normalized, when it is valid."`
+	Errors          []string            `json:"errors,omitempty" jsonschema:"Why the query is invalid."`
+	Warnings        []string            `json:"warnings,omitempty" jsonschema:"Problems that don't make the query invalid."`
+	Suggestions     []string            `json:"suggestions,omitempty" jsonschema:"How to fix the errors and warnings."`
+	SyntaxReference string              `json:"syntax_reference,omitempty" jsonschema:"Where to read about CQL syntax."`
+	Guidance        *ValidationGuidance `json:"guidance,omitempty" jsonschema:"What to do next with this query."`
 }
 
 type CQLBuildResult struct {
-	Valid           bool                `json:"valid"`
-	Query           string              `json:"query,omitempty"`
-	ValidatedFields []string            `json:"validated_fields,omitempty"`
-	UnknownFields   []string            `json:"unknown_fields,omitempty"`
-	Errors          []string            `json:"errors,omitempty"`
-	Suggestions     []string            `json:"suggestions,omitempty"`
-	Guidance        *ValidationGuidance `json:"guidance,omitempty"`
+	Valid           bool                `json:"valid" jsonschema:"Whether a valid query could be built from the filters."`
+	Query           string              `json:"query,omitempty" jsonschema:"The CQL query built from the filters."`
+	ValidatedFields []string            `json:"validated_fields,omitempty" jsonschema:"The filter fields known in the scope."`
+	UnknownFields   []string            `json:"unknown_fields,omitempty" jsonschema:"The filter fields not known in the scope. Check them with discover_schema or facets."`
+	Errors          []string            `json:"errors,omitempty" jsonschema:"Why no valid query could be built."`
+	Suggestions     []string            `json:"suggestions,omitempty" jsonschema:"How to fix the errors."`
+	Guidance        *ValidationGuidance `json:"guidance,omitempty" jsonschema:"What to do next with this query."`
 }
 
 type ValidationGuidance struct {
-	ResultStatus string   `json:"result_status"`
-	NextSteps    []string `json:"next_steps,omitempty"`
+	ResultStatus string   `json:"result_status" jsonschema:"valid or invalid for validate_cql; success for build_cql."`
+	NextSteps    []string `json:"next_steps,omitempty" jsonschema:"The tools to call next, and how."`
 }
 
 var (
@@ -60,6 +60,7 @@ var CommonFacetKeys = map[string][]string{
 // GetValidateCQLTool creates a tool to validate CQL queries before execution
 func GetValidateCQLTool() (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("validate_cql",
+			outputSchema[CQLValidationResult](),
 			mcp.WithTitleAnnotation("Validate CQL Query"),
 			mcp.WithDescription(`Validates a CQL (Common Query Language) query BEFORE executing search.
 
@@ -110,13 +111,14 @@ Returns validation result with errors, warnings, and suggestions for fixes.`),
 
 			result := validateCQL(query, scope)
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 
 // GetBuildCQLTool creates a tool to build valid CQL queries from structured parameters
 func GetBuildCQLTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("build_cql",
+			outputSchema[CQLBuildResult](),
 			mcp.WithTitleAnnotation("Build CQL Query"),
 			mcp.WithDescription(`Constructs a valid CQL query from structured filter parameters.
 
@@ -184,7 +186,7 @@ Output: service.name:"api" AND severity_text:("ERROR" OR "WARN")`),
 
 			result := buildCQL(scope, filters)
 			r, _ := json.Marshal(result)
-			return mcp.NewToolResultText(string(r)), nil
+			return structuredResult(r), nil
 		}
 }
 

@@ -10,6 +10,16 @@ automation and interaction capabilities for developers and tools.
 - Build AI‑powered tools and applications that interact with Edge Delta’s platform.
 
 
+## Tool output schemas
+
+Every tool lists an `outputSchema` in `tools/list` and returns its result as
+`structuredContent` that conforms to it, so a client can type what a tool returns.
+The result is also in a text content block, as the same JSON, for clients that read
+only text. The schemas come from the Go types the tools return, and their field
+descriptions from those types' `jsonschema` tags. Where a tool passes an Edge Delta
+API response through, in a `data` field, the schema allows any JSON there and its
+description gives the response's shape.
+
 ## Pipeline Configuration Tools
 
 The server exposes tools to inspect and change Edge Delta pipelines. Write

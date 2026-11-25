@@ -18,24 +18,24 @@ const (
 )
 
 type ingestionEndpointOut struct {
-	Protocol    string `json:"protocol"`
-	DataType    string `json:"data_type"`
-	URL         string `json:"url"`
-	SampleData  string `json:"sample_data,omitempty"`
-	TestCommand string `json:"test_command,omitempty"`
+	Protocol    string `json:"protocol" jsonschema:"The protocol to send data with."`
+	DataType    string `json:"data_type" jsonschema:"The kind of telemetry the endpoint takes, such as logs, metrics or traces."`
+	URL         string `json:"url" jsonschema:"The endpoint's URL, with the ingestion token in it."`
+	SampleData  string `json:"sample_data,omitempty" jsonschema:"A sample payload the endpoint accepts."`
+	TestCommand string `json:"test_command,omitempty" jsonschema:"A command that sends the sample payload to the endpoint."`
 }
 
 type ingestionPipelineOut struct {
-	ConfID    string                 `json:"conf_id"`
-	Name      string                 `json:"name"`
-	NodeName  string                 `json:"node_name"`
-	Default   bool                   `json:"default"`
-	Endpoints []ingestionEndpointOut `json:"endpoints"`
-	Error     string                 `json:"error,omitempty"`
+	ConfID    string                 `json:"conf_id" jsonschema:"The pipeline's ID."`
+	Name      string                 `json:"name" jsonschema:"The pipeline's name."`
+	NodeName  string                 `json:"node_name" jsonschema:"The pipeline's HTTP ingestion input node that the endpoints send to."`
+	Default   bool                   `json:"default" jsonschema:"Whether this is the org's auto-provisioned telemetry pipeline, to prefer when nothing else decides."`
+	Endpoints []ingestionEndpointOut `json:"endpoints" jsonschema:"The pipeline's ingestion endpoints, one per data type."`
+	Error     string                 `json:"error,omitempty" jsonschema:"Why the pipeline's endpoints couldn't be resolved."`
 }
 
 type getIngestionEndpointOut struct {
-	Pipelines []ingestionPipelineOut `json:"pipelines"`
+	Pipelines []ingestionPipelineOut `json:"pipelines" jsonschema:"Every ingestion pipeline the caller can see."`
 }
 
 // GetIngestionEndpointTool returns Edge Delta ingestion URLs for every
@@ -45,6 +45,7 @@ type getIngestionEndpointOut struct {
 // exists. Tokens are fetched server-side; the caller never provides one.
 func GetIngestionEndpointTool(client Client) (tool mcp.Tool, handler server.ToolHandlerFunc) {
 	return mcp.NewTool("get_ingestion_endpoint",
+			outputSchema[getIngestionEndpointOut](),
 			mcp.WithTitleAnnotation("Get Ingestion Endpoint"),
 			mcp.WithDescription(`Returns Edge Delta ingestion endpoints for every ingestion pipeline in the org (logs, metrics, traces, events) with the stream token embedded as a ?token=... query parameter. Each pipeline includes default=true if it is the auto-provisioned default ("AI-Connector-Telemetry-Pipeline"); prefer the default unless the user has named a specific pipeline. Each endpoint carries a "protocol" field ("http" today; "grpc" may be added later). POST raw payload bodies to HTTP URLs to send telemetry to Edge Delta.`),
 			mcp.WithReadOnlyHintAnnotation(true),
@@ -87,7 +88,7 @@ func GetIngestionEndpointTool(client Client) (tool mcp.Tool, handler server.Tool
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal response: %w", err)
 			}
-			return mcp.NewToolResultText(string(b)), nil
+			return structuredResult(b), nil
 		}
 }
 
